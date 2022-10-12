@@ -19,12 +19,12 @@ describe("sign traduction", function () {
       hardfork: Hardfork.SpuriousDragon,
     });
 
-    const from = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
-    const to = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8";
+    // const from = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
+    const [owner, user2] = await ethers.getSigners();
     const value = "1";
 
-    const fromPrivateKey =
-      "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
+    // const fromPrivateKey =
+    //   "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
 
     // const txCount = await ethers.provider.getTransactionCount(receiverAddress);
 
@@ -32,10 +32,11 @@ describe("sign traduction", function () {
       nonce: 0,
       gasPrice: "0x09184e72a000",
       gasLimit: "0x7530",
-      to,
+      to: await user2.getAddress(),
       value: ethers.utils.parseEther(value).toHexString(),
       data: "0x7f7465737432000000000000000000000000000000000000000000000000000000600057",
     };
+
     const tx = Transaction.fromTxData(txParams, { common });
 
     // const privateKey = Buffer.from(fromPrivateKey.split("x")[1], "hex");
@@ -67,7 +68,6 @@ describe("sign traduction", function () {
     const tx2 = Transaction.fromSerializedTx(Buffer.from(hex2.slice(2), "hex"));
     const receiverAddress = tx2.getSenderAddress().toString("hex");
 
-    const [owner, user2] = await ethers.getSigners();
     await owner.sendTransaction({
       to: receiverAddress,
       value: ethers.utils.parseEther("15"),
