@@ -1,0 +1,26 @@
+{
+  "name": "sign-evm-translocation",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^2.0.0",
+    "@nomiclabs/hardhat-ethers": "^2.2.0",
+    "ethers": "^5.7.1",
+    "hardhat": "^2.12.0"
+  },
+  "dependencies": {
+    "@ethereumjs/tx": "^4.0.0",
+    "@nomicfoundation/ethereumjs-rlp": "^4.0.0",
+    "@nomicfoundation/ethereumjs-util": "^8.0.0",
+    "dotenv": "^16.0.3",
+    "ethereum-cryptography": "^1.1.2",
+    "ethereumjs-tx": "^2.1.2"
+  }
+}
