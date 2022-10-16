@@ -1,0 +1,5 @@
+service : {
+  public_key : () -> (variant { Ok: record { public_key: blob; }; Err: text });
+  sign : (blob) -> (variant { Ok: record { signature: blob; }; Err: text });
+  gretter: (text) -> (text);
+}

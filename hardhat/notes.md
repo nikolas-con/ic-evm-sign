@@ -6,9 +6,7 @@
   - signIC(msgHash) -> signature
 - signTx(signature, hexRaw) -> hexSigned
 - clean up
-
-
-
+§
 
 
 ## evm tx 

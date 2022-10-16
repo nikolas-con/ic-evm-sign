@@ -42,4 +42,18 @@ after
   "s": "34d45214ab378f45a40a14b4c26342bf94266035a15559170323e793a4a92f5b"
 }
 
+``js
+ function ecsign(msgHash, privateKey, chainId) {
+  const [signature, recovery] = signSync(msgHash, privateKey, {
+    recovered: true,     der: false,
+   });
 
+   const r = Buffer.from(signature.slice(0, 32));
+   const s = Buffer.from(signature.slice(32, 64));
+
+   // alagi
+   const v = Buffer.from("25", "hex");
+
+   return { r, s, v };
+}
+``
