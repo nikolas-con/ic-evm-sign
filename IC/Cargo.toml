@@ -1,0 +1,2 @@
+[workspace]
+members = ["src/IC_backend", "src/no_key_wallet"]

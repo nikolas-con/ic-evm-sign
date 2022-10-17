@@ -28,15 +28,14 @@ describe("sign traduction", function () {
       });
 
       return {
-        gretter: IDL.Func([IDL.Text], [IDL.Text], []),
-        sign: IDL.Func(
-          [IDL.Vec(IDL.Nat8)],
-          [IDL.Variant({ Ok: sign_info, Err: IDL.Text })],
-          []
-        ),
-        public_key: IDL.Func(
+        get_public_key: IDL.Func(
           [],
           [IDL.Variant({ Ok: public_key_info, Err: IDL.Text })],
+          []
+        ),
+        sign_evm_tx: IDL.Func(
+          [IDL.Vec(IDL.Nat8)],
+          [IDL.Variant({ Ok: sign_info, Err: IDL.Text })],
           []
         ),
       };
@@ -46,12 +45,11 @@ describe("sign traduction", function () {
     const canisters = require(path.resolve(
       "..",
       "IC",
-      "threshold-ecdsa",
       ".dfx",
       "local",
       "canister_ids.json"
     ));
-    const canisterId = Principal.fromText(canisters.ecdsa_example_rust.local);
+    const canisterId = Principal.fromText(canisters.IC_backend.local);
 
     const agent = new HttpAgent({ host: "http://localhost:8000" });
     agent.fetchRootKey();
@@ -118,7 +116,7 @@ const createRawTx = (txParams) => {
 
 const getTxSignature = async (rawTX, actor) => {
   const msgHash = getMessageToSign(rawTX, true);
-  const getSignature = await actor.sign([...msgHash]);
+  const getSignature = await actor.sign_evm_tx([...msgHash]);
   const signature = Buffer.from(getSignature.Ok.signature, "hex");
 
   return signature;
