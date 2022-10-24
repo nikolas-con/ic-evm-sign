@@ -24,7 +24,7 @@ describe("sign traduction", function () {
         public_key: IDL.Vec(IDL.Nat8),
       });
       const sign_info = IDL.Record({
-        signature: IDL.Vec(IDL.Nat8),
+        sign_tx: IDL.Vec(IDL.Nat8),
       });
 
       return {
@@ -34,7 +34,7 @@ describe("sign traduction", function () {
           []
         ),
         sign_evm_tx: IDL.Func(
-          [IDL.Vec(IDL.Nat8)],
+          [IDL.Vec(IDL.Nat8), IDL.Vec(IDL.Nat8)],
           [IDL.Variant({ Ok: sign_info, Err: IDL.Text })],
           []
         ),
@@ -73,9 +73,7 @@ describe("sign traduction", function () {
 
     const tx = createRawTx(txParams);
 
-    const signature = await getTxSignature(tx.raw(), actor);
-
-    const signedTx = signTx(signature, tx);
+    const signedTx = await signTx(tx, actor);
 
     const tx2 = Transaction.fromSerializedTx(
       Buffer.from(signedTx.slice(2), "hex")
@@ -114,12 +112,14 @@ const createRawTx = (txParams) => {
   return tx;
 };
 
-const getTxSignature = async (rawTX, actor) => {
-  const msgHash = getMessageToSign(rawTX, true);
-  const getSignature = await actor.sign_evm_tx([...msgHash]);
-  const signature = Buffer.from(getSignature.Ok.signature, "hex");
+const signTx = async (rawTX, actor) => {
+  const msgHash = getMessageToSign(rawTX.raw(), true);
 
-  return signature;
+  const serializedTx = rawTX.serialize();
+
+  const signedTX = await actor.sign_evm_tx([...serializedTx], [...msgHash]);
+
+  return "0x" + Buffer.from(signedTX.Ok.sign_tx, "hex").toString("hex");
 };
 
 const getMessageToSign = (raw, hashMessage = true) => {
@@ -144,26 +144,26 @@ const getMessageToSign = (raw, hashMessage = true) => {
 };
 // - signTx(signature, hexRaw) -> hexSigned
 
-const signTx = (signature, txHexRaw) => {
-  const r = signature.subarray(0, 32);
-  const s = signature.subarray(32, 64);
-  const v = Buffer.from("25", "hex");
+// const signTx = (signature, txHexRaw) => {
+//   const r = signature.subarray(0, 32);
+//   const s = signature.subarray(32, 64);
+//   const v = Buffer.from("25", "hex");
 
-  const serializedTx = txHexRaw.serialize();
+//   const serializedTx = txHexRaw.serialize();
+//   console.log(serializedTx.subarray(0, -3));
+//   const hex =
+//     serializedTx.toString("hex").slice(0, -6) +
+//     v.toString("hex") +
+//     "a0" +
+//     r.toString("hex") +
+//     "a0" +
+//     s.toString("hex");
 
-  const hex =
-    serializedTx.toString("hex").slice(0, -6) +
-    v.toString("hex") +
-    "a0" +
-    r.toString("hex") +
-    "a0" +
-    s.toString("hex");
+//   const hex2 =
+//     "0x" +
+//     hex.substring(0, 2) +
+//     (hex.substring(4).length / 2).toString(16) +
+//     hex.substring(4);
 
-  const hex2 =
-    "0x" +
-    hex.substring(0, 2) +
-    (hex.substring(4).length / 2).toString(16) +
-    hex.substring(4);
-
-  return hex2;
-};
+//   return hex2;
+// };

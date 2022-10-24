@@ -13,7 +13,7 @@ pub struct PublicKeyReply {
 
 #[derive(CandidType, Serialize, Debug)]
 pub struct SignatureReply {
-    pub signature: Vec<u8>,
+    pub sign_tx: Vec<u8>,
 }
 
 type CanisterId = Principal;
@@ -79,8 +79,8 @@ pub async fn public_key(caller: Vec<u8>) -> CallResult<PublicKeyReply> {
     })
 }
 
-pub async fn sign(message: Vec<u8>) -> CallResult<SignatureReply> {
-    assert!(message.len() == 32);
+pub async fn sign(hex_raw_tx: Vec<u8>, msg_hash: Vec<u8>) -> CallResult<SignatureReply> {
+    assert!(msg_hash.len() == 32);
 
     let key_id = EcdsaKeyId {
         curve: EcdsaCurve::Secp256k1,
@@ -91,7 +91,7 @@ pub async fn sign(message: Vec<u8>) -> CallResult<SignatureReply> {
 
     let caller = ic_cdk::caller().as_slice().to_vec();
     let request = SignWithECDSA {
-        message_hash: message.clone(),
+        message_hash: msg_hash.clone(),
         derivation_path: vec![caller],
         key_id,
     };
@@ -101,7 +101,21 @@ pub async fn sign(message: Vec<u8>) -> CallResult<SignatureReply> {
             .map_err(|e| format!("Failed to call sign_with_ecdsa {}", e.1))
             .unwrap();
 
-    Ok(SignatureReply {
-        signature: res.signature,
-    })
+    let signed_tx = sign_tx(res.signature, hex_raw_tx);
+
+    Ok(SignatureReply { sign_tx: signed_tx })
+}
+
+fn sign_tx(signature: Vec<u8>, hex_raw_tx: Vec<u8>) -> Vec<u8> {
+    let r = &signature[..32];
+    let s = &signature[32..];
+    let v = &[u8::from(37)];
+
+    let removed_last = &hex_raw_tx[0..hex_raw_tx.len() - 3];
+
+    let hex = [removed_last, v, &[u8::from(160)], r, &[u8::from(160)], s].concat();
+
+    let msg_length = u8::try_from(hex[2..].len()).unwrap();
+
+    [&hex[..1], &[msg_length], &hex[2..]].concat()
 }
