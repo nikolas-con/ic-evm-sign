@@ -113,7 +113,7 @@ const createRawTx = (txParams) => {
 };
 
 const signTx = async (rawTX, actor) => {
-  const msgHash = getMessageToSign(rawTX.raw(), true);
+  const msgHash = getMessageToSign(rawTX.serialize());
 
   const serializedTx = rawTX.serialize();
 
@@ -122,48 +122,18 @@ const signTx = async (rawTX, actor) => {
   return "0x" + Buffer.from(signedTX.Ok.sign_tx, "hex").toString("hex");
 };
 
-const getMessageToSign = (raw, hashMessage = true) => {
-  const message = raw.slice(0, 6);
-  message.push(Buffer.from("01", "hex"));
-  message.push(Buffer.from("", "hex"));
-  message.push(Buffer.from("", "hex"));
+const getMessageToSign = (rawTxHex) => {
+  const tx = Transaction.fromSerializedTx(rawTxHex);
 
-  if (hashMessage) {
-    return Buffer.from(
-      (0, keccak_1.keccak256)(
-        (0, ethereumjs_util_1.arrToBufArr)(
-          ethereumjs_rlp_1.RLP.encode(
-            (0, ethereumjs_util_1.bufArrToArr)(message)
-          )
-        )
-      )
-    );
-  } else {
-    return message;
-  }
+  const rawTx = tx.raw();
+
+  rawTx[6] = Buffer.from("01", "hex");
+
+  const bufArrToArr = rawTx.map((item) => Uint8Array.from(item ?? []));
+
+  const encode = ethereumjs_rlp_1.RLP.encode(bufArrToArr);
+
+  const convertedToHex = Buffer.from(encode, "hex");
+
+  return keccak_1.keccak256(convertedToHex);
 };
-// - signTx(signature, hexRaw) -> hexSigned
-
-// const signTx = (signature, txHexRaw) => {
-//   const r = signature.subarray(0, 32);
-//   const s = signature.subarray(32, 64);
-//   const v = Buffer.from("25", "hex");
-
-//   const serializedTx = txHexRaw.serialize();
-//   console.log(serializedTx.subarray(0, -3));
-//   const hex =
-//     serializedTx.toString("hex").slice(0, -6) +
-//     v.toString("hex") +
-//     "a0" +
-//     r.toString("hex") +
-//     "a0" +
-//     s.toString("hex");
-
-//   const hex2 =
-//     "0x" +
-//     hex.substring(0, 2) +
-//     (hex.substring(4).length / 2).toString(16) +
-//     hex.substring(4);
-
-//   return hex2;
-// };
