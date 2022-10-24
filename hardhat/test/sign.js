@@ -131,9 +131,14 @@ const getMessageToSign = (rawTxHex) => {
 
   const bufArrToArr = rawTx.map((item) => Uint8Array.from(item ?? []));
 
+  console.log(bufArrToArr);
   const encode = ethereumjs_rlp_1.RLP.encode(bufArrToArr);
 
   const convertedToHex = Buffer.from(encode, "hex");
 
-  return keccak_1.keccak256(convertedToHex);
+  console.log(convertedToHex.toString("hex"));
+
+  const hexHash = keccak_1.keccak256(convertedToHex);
+
+  return hexHash;
 };

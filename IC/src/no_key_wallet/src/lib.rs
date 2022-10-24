@@ -1,10 +1,15 @@
 use ic_cdk::api::call::CallResult;
-
 use ic_cdk::export::{
     candid::CandidType,
     serde::{Deserialize, Serialize},
     Principal,
 };
+
+use rlp::Encodable;
+
+use std::vec::Vec;
+
+use sha3::{Digest, Keccak256};
 
 #[derive(CandidType, Serialize, Debug)]
 pub struct PublicKeyReply {
@@ -55,6 +60,7 @@ pub enum EcdsaCurve {
     Secp256k1,
 }
 use std::str::FromStr;
+use std::vec;
 pub async fn public_key(caller: Vec<u8>) -> CallResult<PublicKeyReply> {
     let key_id = EcdsaKeyId {
         curve: EcdsaCurve::Secp256k1,
@@ -90,8 +96,11 @@ pub async fn sign(hex_raw_tx: Vec<u8>, msg_hash: Vec<u8>) -> CallResult<Signatur
     let ic = CanisterId::from_str(&ic_canister_id).unwrap();
 
     let caller = ic_cdk::caller().as_slice().to_vec();
+
+    let msg_hash1 = get_message_to_sign(hex_raw_tx.clone());
+
     let request = SignWithECDSA {
-        message_hash: msg_hash.clone(),
+        message_hash: msg_hash1.clone(),
         derivation_path: vec![caller],
         key_id,
     };
@@ -104,6 +113,20 @@ pub async fn sign(hex_raw_tx: Vec<u8>, msg_hash: Vec<u8>) -> CallResult<Signatur
     let signed_tx = sign_tx(res.signature, hex_raw_tx);
 
     Ok(SignatureReply { sign_tx: signed_tx })
+}
+
+fn get_message_to_sign(hex_raw_tx: Vec<u8>) -> Vec<u8> {
+    let mut raw_tx = hex_raw_tx.clone();
+
+    raw_tx[80] = u8::from(1);
+
+    let mut hasher = Keccak256::new();
+
+    hasher.update(&hex_raw_tx[..]);
+
+    let result = hasher.finalize();
+
+    result.to_vec()
 }
 
 fn sign_tx(signature: Vec<u8>, hex_raw_tx: Vec<u8>) -> Vec<u8> {
