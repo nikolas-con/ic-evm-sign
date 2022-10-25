@@ -44,11 +44,11 @@ describe("sign traduction", function () {
 
     const canisters = require(path.resolve(
       "..",
-      "IC",
       ".dfx",
       "local",
       "canister_ids.json"
     ));
+
     const canisterId = Principal.fromText(canisters.IC_backend.local);
 
     const agent = new HttpAgent({ host: "http://localhost:8000" });

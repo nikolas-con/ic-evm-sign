@@ -12,4 +12,4 @@ crate-type = ["cdylib"]
 candid = "0.7.14"
 ic-cdk = "0.5.2"
 ic-cdk-macros = "0.5.2"
-no_key_wallet = { path = "../no_key_wallet" }
+no_key_wallet = { path = "../../no_key_wallet" }

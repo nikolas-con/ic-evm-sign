@@ -5,7 +5,7 @@
     "IC_backend": {
       "type": "rust",
       "package": "IC_backend",
-      "candid": "src/IC_backend/IC_backend.did"
+      "candid": "dev/IC_backend/IC_backend.did"
     }
   },
   "defaults": {

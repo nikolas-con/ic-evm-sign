@@ -1,0 +1,2 @@
+[workspace]
+members = ["dev/IC_backend", "no_key_wallet"]
