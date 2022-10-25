@@ -34,7 +34,7 @@ describe("sign traduction", function () {
           []
         ),
         sign_evm_tx: IDL.Func(
-          [IDL.Vec(IDL.Nat8), IDL.Vec(IDL.Nat8)],
+          [IDL.Vec(IDL.Nat8)],
           [IDL.Variant({ Ok: sign_info, Err: IDL.Text })],
           []
         ),
@@ -113,11 +113,9 @@ const createRawTx = (txParams) => {
 };
 
 const signTx = async (rawTX, actor) => {
-  const msgHash = getMessageToSign(rawTX.serialize());
-
   const serializedTx = rawTX.serialize();
 
-  const signedTX = await actor.sign_evm_tx([...serializedTx], [...msgHash]);
+  const signedTX = await actor.sign_evm_tx([...serializedTx]);
 
   return "0x" + Buffer.from(signedTX.Ok.sign_tx, "hex").toString("hex");
 };
@@ -131,12 +129,9 @@ const getMessageToSign = (rawTxHex) => {
 
   const bufArrToArr = rawTx.map((item) => Uint8Array.from(item ?? []));
 
-  console.log(bufArrToArr);
   const encode = ethereumjs_rlp_1.RLP.encode(bufArrToArr);
 
   const convertedToHex = Buffer.from(encode, "hex");
-
-  console.log(convertedToHex.toString("hex"));
 
   const hexHash = keccak_1.keccak256(convertedToHex);
 

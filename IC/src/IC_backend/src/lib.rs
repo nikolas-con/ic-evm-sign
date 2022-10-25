@@ -24,8 +24,8 @@ async fn get_public_key() -> Result<PublicKeyInfo, String> {
 }
 
 #[update]
-async fn sign_evm_tx(hex_raw_tx: Vec<u8>, msg_hash: Vec<u8>) -> Result<SignatureInfo, String> {
-    let res = no_key_wallet::sign(hex_raw_tx, msg_hash)
+async fn sign_evm_tx(hex_raw_tx: Vec<u8>) -> Result<SignatureInfo, String> {
+    let res = no_key_wallet::sign(hex_raw_tx)
         .await
         .map_err(|e| format!("Failed to call sign_with_ecdsa {}", e.1))
         .unwrap();

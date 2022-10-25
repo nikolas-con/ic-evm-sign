@@ -1,13 +1,11 @@
+use crate::rlp::RlpStream;
 use ic_cdk::api::call::CallResult;
 use ic_cdk::export::{
     candid::CandidType,
     serde::{Deserialize, Serialize},
     Principal,
 };
-
-use rlp::Encodable;
-
-use std::vec::Vec;
+use rlp;
 
 use sha3::{Digest, Keccak256};
 
@@ -85,7 +83,9 @@ pub async fn public_key(caller: Vec<u8>) -> CallResult<PublicKeyReply> {
     })
 }
 
-pub async fn sign(hex_raw_tx: Vec<u8>, msg_hash: Vec<u8>) -> CallResult<SignatureReply> {
+pub async fn sign(hex_raw_tx: Vec<u8>) -> CallResult<SignatureReply> {
+    let msg_hash = get_message_to_sign(hex_raw_tx.clone());
+
     assert!(msg_hash.len() == 32);
 
     let key_id = EcdsaKeyId {
@@ -97,10 +97,8 @@ pub async fn sign(hex_raw_tx: Vec<u8>, msg_hash: Vec<u8>) -> CallResult<Signatur
 
     let caller = ic_cdk::caller().as_slice().to_vec();
 
-    let msg_hash1 = get_message_to_sign(hex_raw_tx.clone());
-
     let request = SignWithECDSA {
-        message_hash: msg_hash1.clone(),
+        message_hash: msg_hash.clone(),
         derivation_path: vec![caller],
         key_id,
     };
@@ -118,8 +116,43 @@ pub async fn sign(hex_raw_tx: Vec<u8>, msg_hash: Vec<u8>) -> CallResult<Signatur
 fn get_message_to_sign(hex_raw_tx: Vec<u8>) -> Vec<u8> {
     let mut raw_tx = hex_raw_tx.clone();
 
-    raw_tx[80] = u8::from(1);
+    raw_tx.insert(0, 0x83);
 
+    let mut decoded_tx = decode_tx(raw_tx.clone());
+
+    decoded_tx[6] = vec![u8::from(1)];
+
+    let encoded_tx = encode_tx(decoded_tx);
+
+    hash_tx(&encoded_tx)
+}
+
+fn decode_tx(hex_raw_tx: Vec<u8>) -> Vec<Vec<u8>> {
+    let mut index = 0;
+    let data_len = hex_raw_tx.len();
+    let mut decode_tx: Vec<Vec<u8>> = vec![];
+
+    while index < data_len {
+        let decode_data: Vec<u8> = rlp::decode(&hex_raw_tx[index..]);
+        index = index + decode_data.len() + 1;
+        decode_tx.push(decode_data);
+    }
+
+    decode_tx
+}
+fn encode_tx(decoded_txt: Vec<Vec<u8>>) -> Vec<u8> {
+    let mut stream = RlpStream::new_list(decoded_txt.len());
+
+    for chucks in decoded_txt {
+        stream.append(&chucks);
+    }
+
+    let out = stream.out();
+
+    out
+}
+
+fn hash_tx(hex_raw_tx: &Vec<u8>) -> Vec<u8> {
     let mut hasher = Keccak256::new();
 
     hasher.update(&hex_raw_tx[..]);
