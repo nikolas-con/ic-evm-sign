@@ -4,8 +4,8 @@
   "canisters": {
     "IC_backend": {
       "type": "rust",
-      "package": "IC_backend",
-      "candid": "dev/IC_backend/IC_backend.did"
+      "package": "backend",
+      "candid": "dev/backend/backend.did"
     }
   },
   "defaults": {

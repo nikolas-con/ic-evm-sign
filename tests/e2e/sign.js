@@ -44,6 +44,7 @@ describe("sign traduction", function () {
 
     const canisters = require(path.resolve(
       "..",
+      "..",
       ".dfx",
       "local",
       "canister_ids.json"
@@ -58,7 +59,7 @@ describe("sign traduction", function () {
     actor = Actor.createActor(idlFactory, createActorOptions);
   });
 
-  it("completes the withdrawal", async function () {
+  it("sign traduction e2e", async function () {
     const [owner, user2] = await ethers.getSigners();
     const value = "1";
 

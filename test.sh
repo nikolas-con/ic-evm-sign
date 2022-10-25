@@ -4,6 +4,6 @@ dfx start --clean --background
 
 dfx deploy
 
-cd tests && npx hardhat test
+cd tests/e2e && npx hardhat test ./sign.js
 
 dfx stop

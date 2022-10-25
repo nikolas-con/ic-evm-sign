@@ -1,2 +1,2 @@
 [workspace]
-members = ["dev/IC_backend", "no_key_wallet"]
+members = ["dev/backend", "lib/no_key_wallet"]
