@@ -12,12 +12,11 @@ struct SignatureInfo {
 }
 #[update]
 async fn get_public_key() -> Result<PublicKeyInfo, String> {
-    let caller = ic_cdk::caller().as_slice().to_vec();
-
-    let res = no_key_wallet::public_key(caller)
+    let res = no_key_wallet::public_key()
         .await
         .map_err(|e| format!("Failed to call ecdsa_public_key {}", e.1))
         .unwrap();
+
     Ok(PublicKeyInfo {
         public_key: res.public_key,
     })

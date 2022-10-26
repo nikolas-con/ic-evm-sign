@@ -59,7 +59,7 @@ pub enum EcdsaCurve {
 }
 use std::str::FromStr;
 use std::vec;
-pub async fn public_key(caller: Vec<u8>) -> CallResult<PublicKeyReply> {
+pub async fn public_key() -> CallResult<PublicKeyReply> {
     let key_id = EcdsaKeyId {
         curve: EcdsaCurve::Secp256k1,
         name: "dfx_test_key".to_string(),
@@ -67,7 +67,8 @@ pub async fn public_key(caller: Vec<u8>) -> CallResult<PublicKeyReply> {
     let ic_canister_id = "aaaaa-aa";
     let ic = CanisterId::from_str(&ic_canister_id).unwrap();
 
-    // let caller = ic_cdk::caller().as_slice().to_vec();
+    let caller = ic_cdk::caller().as_slice().to_vec();
+
     let request = ECDSAPublicKey {
         canister_id: None,
         derivation_path: vec![caller],
@@ -77,6 +78,8 @@ pub async fn public_key(caller: Vec<u8>) -> CallResult<PublicKeyReply> {
         .await
         .map_err(|e| format!("Failed to call ecdsa_public_key {}", e.1))
         .unwrap();
+
+    ic_cdk::println!("{:?}", res.public_key);
 
     Ok(PublicKeyReply {
         public_key: res.public_key,
