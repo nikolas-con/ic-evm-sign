@@ -17,6 +17,8 @@ pub struct PublicKeyReply {
 #[derive(CandidType, Serialize, Debug)]
 pub struct SignatureReply {
     pub sign_tx: Vec<u8>,
+    pub signature: Vec<u8>,
+    pub msg_hash: Vec<u8>,
 }
 
 type CanisterId = Principal;
@@ -67,11 +69,9 @@ pub async fn public_key() -> CallResult<PublicKeyReply> {
     let ic_canister_id = "aaaaa-aa";
     let ic = CanisterId::from_str(&ic_canister_id).unwrap();
 
-    let caller = ic_cdk::caller().as_slice().to_vec();
-
     let request = ECDSAPublicKey {
         canister_id: None,
-        derivation_path: vec![caller],
+        derivation_path: vec![vec![0, 0, 0, 0]],
         key_id: key_id.clone(),
     };
     let (res,): (ECDSAPublicKeyReply,) = ic_cdk::call(ic, "ecdsa_public_key", (request,))
@@ -88,6 +88,7 @@ pub async fn public_key() -> CallResult<PublicKeyReply> {
 
 pub async fn sign(hex_raw_tx: Vec<u8>) -> CallResult<SignatureReply> {
     let msg_hash = get_message_to_sign(hex_raw_tx.clone());
+    ic_cdk::println!("{:?}", msg_hash);
 
     assert!(msg_hash.len() == 32);
 
@@ -98,11 +99,9 @@ pub async fn sign(hex_raw_tx: Vec<u8>) -> CallResult<SignatureReply> {
     let ic_canister_id = "aaaaa-aa";
     let ic = CanisterId::from_str(&ic_canister_id).unwrap();
 
-    let caller = ic_cdk::caller().as_slice().to_vec();
-
     let request = SignWithECDSA {
         message_hash: msg_hash.clone(),
-        derivation_path: vec![caller],
+        derivation_path: vec![vec![0, 0, 0, 0]],
         key_id,
     };
     let (res,): (SignWithECDSAReply,) =
@@ -111,9 +110,13 @@ pub async fn sign(hex_raw_tx: Vec<u8>) -> CallResult<SignatureReply> {
             .map_err(|e| format!("Failed to call sign_with_ecdsa {}", e.1))
             .unwrap();
 
-    let signed_tx = sign_tx(res.signature, hex_raw_tx);
+    let signed_tx = sign_tx(res.signature.clone(), hex_raw_tx);
 
-    Ok(SignatureReply { sign_tx: signed_tx })
+    Ok(SignatureReply {
+        sign_tx: signed_tx,
+        signature: res.signature,
+        msg_hash: msg_hash,
+    })
 }
 
 fn get_message_to_sign(hex_raw_tx: Vec<u8>) -> Vec<u8> {

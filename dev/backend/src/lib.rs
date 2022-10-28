@@ -9,6 +9,8 @@ struct PublicKeyInfo {
 #[derive(Debug, CandidType)]
 struct SignatureInfo {
     sign_tx: Vec<u8>,
+    signature: Vec<u8>,
+    msg_hash: Vec<u8>,
 }
 #[update]
 async fn get_public_key() -> Result<PublicKeyInfo, String> {
@@ -31,6 +33,8 @@ async fn sign_evm_tx(hex_raw_tx: Vec<u8>) -> Result<SignatureInfo, String> {
 
     Ok(SignatureInfo {
         sign_tx: res.sign_tx,
+        signature: res.signature,
+        msg_hash: res.msg_hash,
     })
 }
 
