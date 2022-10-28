@@ -68,8 +68,7 @@ const App = () => {
   const handle = async () => {
     const res = await actor.get_public_key();
     const publicKey = res.Ok.public_key;
-
-    console.log(convertToHex(publicKey.buffer));
+    console.log("0x" + Buffer.from([...publicKey], "hex").toString("hex"));
   };
 
   return (
