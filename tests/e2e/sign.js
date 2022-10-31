@@ -4,10 +4,6 @@ const { Principal } = require("@dfinity/principal");
 const { Chain, Common, Hardfork } = require("@ethereumjs/common");
 const { Transaction } = require("@ethereumjs/tx");
 
-const ethereumjs_rlp_1 = require("@nomicfoundation/ethereumjs-rlp");
-const ethereumjs_util_1 = require("@nomicfoundation/ethereumjs-util");
-const keccak_1 = require("ethereum-cryptography/keccak");
-
 const { assert } = require("chai");
 const { ethers } = require("hardhat");
 
@@ -20,22 +16,23 @@ describe("sign traduction", function () {
 
   before(async () => {
     const idleServiceOptions = (IDL) => {
-      const public_key_info = IDL.Record({
+      const create_user_response = IDL.Record({
         public_key: IDL.Vec(IDL.Nat8),
+        address: IDL.Text,
       });
-      const sign_info = IDL.Record({
+      const sign_tx_response = IDL.Record({
         sign_tx: IDL.Vec(IDL.Nat8),
       });
 
       return {
-        get_public_key: IDL.Func(
+        create_user: IDL.Func(
           [],
-          [IDL.Variant({ Ok: public_key_info, Err: IDL.Text })],
+          [IDL.Variant({ Ok: create_user_response, Err: IDL.Text })],
           []
         ),
         sign_evm_tx: IDL.Func(
-          [IDL.Vec(IDL.Nat8)],
-          [IDL.Variant({ Ok: sign_info, Err: IDL.Text })],
+          [IDL.Vec(IDL.Nat8), IDL.Vec(IDL.Nat8)],
+          [IDL.Variant({ Ok: sign_tx_response, Err: IDL.Text })],
           []
         ),
       };
@@ -63,6 +60,14 @@ describe("sign traduction", function () {
     const [owner, user2] = await ethers.getSigners();
     const value = "1";
 
+    const res = await actor.create_user();
+    const { public_key, address } = res.Ok;
+
+    await owner.sendTransaction({
+      to: address,
+      value: ethers.utils.parseEther("15"),
+    });
+
     const txParams = {
       nonce: 0,
       gasPrice: "0x09184e72a000",
@@ -74,29 +79,20 @@ describe("sign traduction", function () {
 
     const tx = createRawTx(txParams);
 
-    const signedTx = await signTx(tx, actor);
+    const signedTx = await signTx(tx, public_key, actor);
 
-    const tx2 = Transaction.fromSerializedTx(
-      Buffer.from(signedTx.slice(2), "hex")
-    );
-    const receiverAddress = tx2.getSenderAddress().toString("hex");
-
-    await owner.sendTransaction({
-      to: receiverAddress,
-      value: ethers.utils.parseEther("15"),
-    });
-
-    const icBefore = await ethers.provider.getBalance(receiverAddress);
     const user2Before = await user2.getBalance();
 
     const { hash } = await ethers.provider.sendTransaction(signedTx);
 
     await ethers.provider.waitForTransaction(hash);
 
-    const icAfter = await ethers.provider.getBalance(receiverAddress);
+    const icAfter = await ethers.provider.getBalance(address);
+
     const user2After = await user2.getBalance();
-    console.log("user2After", user2After);
-    console.log("user2Before", user2Before);
+
+    console.log("user2After", ethers.utils.formatEther(user2After));
+    console.log("user2Before", ethers.utils.formatEther(user2Before));
 
     assert.ok(user2After.sub(user2Before).eq(ethers.utils.parseEther(value)));
   });
@@ -113,28 +109,10 @@ const createRawTx = (txParams) => {
   return tx;
 };
 
-const signTx = async (rawTX, actor) => {
+const signTx = async (rawTX, public_key, actor) => {
   const serializedTx = rawTX.serialize();
 
-  const signedTX = await actor.sign_evm_tx([...serializedTx]);
+  const res = await actor.sign_evm_tx([...serializedTx], public_key);
 
-  return "0x" + Buffer.from(signedTX.Ok.sign_tx, "hex").toString("hex");
-};
-
-const getMessageToSign = (rawTxHex) => {
-  const tx = Transaction.fromSerializedTx(rawTxHex);
-
-  const rawTx = tx.raw();
-
-  rawTx[6] = Buffer.from("01", "hex");
-
-  const bufArrToArr = rawTx.map((item) => Uint8Array.from(item ?? []));
-
-  const encode = ethereumjs_rlp_1.RLP.encode(bufArrToArr);
-
-  const convertedToHex = Buffer.from(encode, "hex");
-
-  const hexHash = keccak_1.keccak256(convertedToHex);
-
-  return hexHash;
+  return "0x" + Buffer.from(res.Ok.sign_tx, "hex").toString("hex");
 };

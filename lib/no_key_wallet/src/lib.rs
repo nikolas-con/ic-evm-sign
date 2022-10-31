@@ -7,7 +7,7 @@ use ic_cdk::export::{
 };
 use rlp;
 
-use sha3::{Digest, Keccak256};
+use easy_hasher::easy_hasher;
 
 #[derive(CandidType, Serialize, Debug)]
 pub struct PublicKeyReply {
@@ -15,10 +15,13 @@ pub struct PublicKeyReply {
 }
 
 #[derive(CandidType, Serialize, Debug)]
-pub struct SignatureReply {
+pub struct CreateResponse {
+    pub public_key: Vec<u8>,
+    pub address: String,
+}
+#[derive(CandidType, Deserialize, Debug)]
+pub struct SignResponse {
     pub sign_tx: Vec<u8>,
-    pub signature: Vec<u8>,
-    pub msg_hash: Vec<u8>,
 }
 
 type CanisterId = Principal;
@@ -30,17 +33,16 @@ struct ECDSAPublicKey {
     pub key_id: EcdsaKeyId,
 }
 
-#[derive(CandidType, Deserialize, Debug)]
-struct ECDSAPublicKeyReply {
-    pub public_key: Vec<u8>,
-    pub chain_code: Vec<u8>,
-}
-
 #[derive(CandidType, Serialize, Debug)]
 struct SignWithECDSA {
     pub message_hash: Vec<u8>,
     pub derivation_path: Vec<Vec<u8>>,
     pub key_id: EcdsaKeyId,
+}
+#[derive(CandidType, Deserialize, Debug)]
+struct ECDSAPublicKeyReply {
+    pub public_key: Vec<u8>,
+    pub chain_code: Vec<u8>,
 }
 
 #[derive(CandidType, Deserialize, Debug)]
@@ -61,64 +63,70 @@ pub enum EcdsaCurve {
 }
 use std::str::FromStr;
 use std::vec;
-pub async fn public_key() -> CallResult<PublicKeyReply> {
+
+pub async fn create() -> Result<CreateResponse, String> {
     let key_id = EcdsaKeyId {
         curve: EcdsaCurve::Secp256k1,
         name: "dfx_test_key".to_string(),
     };
-    let ic_canister_id = "aaaaa-aa";
-    let ic = CanisterId::from_str(&ic_canister_id).unwrap();
 
     let request = ECDSAPublicKey {
         canister_id: None,
         derivation_path: vec![vec![0, 0, 0, 0]],
         key_id: key_id.clone(),
     };
-    let (res,): (ECDSAPublicKeyReply,) = ic_cdk::call(ic, "ecdsa_public_key", (request,))
-        .await
-        .map_err(|e| format!("Failed to call ecdsa_public_key {}", e.1))
-        .unwrap();
+    let (res,): (ECDSAPublicKeyReply,) = ic_cdk::call(
+        Principal::management_canister(),
+        "ecdsa_public_key",
+        (request,),
+    )
+    .await
+    .map_err(|e| format!("Failed to call ecdsa_public_key {}", e.1))?;
 
-    ic_cdk::println!("{:?}", res.public_key);
+    let pub_key_arr: [u8; 33] = res.public_key[..].try_into().unwrap();
+    let pub_key = libsecp256k1::PublicKey::parse_compressed(&pub_key_arr)
+        .unwrap()
+        .serialize();
 
-    Ok(PublicKeyReply {
+    let keccak256 = easy_hasher::raw_keccak256(pub_key[1..].to_vec());
+    let keccak256_hex = keccak256.to_hex_string();
+    let address: String = "0x".to_owned() + &keccak256_hex[24..];
+
+    Ok(CreateResponse {
+        address,
         public_key: res.public_key,
     })
 }
 
-pub async fn sign(hex_raw_tx: Vec<u8>) -> CallResult<SignatureReply> {
-    let msg_hash = get_message_to_sign(hex_raw_tx.clone());
-    ic_cdk::println!("{:?}", msg_hash);
+pub async fn sign(hex_raw_tx: Vec<u8>, public_key: Vec<u8>) -> Result<SignResponse, String> {
+    let message = get_message_to_sign(hex_raw_tx.clone());
 
-    assert!(msg_hash.len() == 32);
+    assert!(message.len() == 32);
 
     let key_id = EcdsaKeyId {
         curve: EcdsaCurve::Secp256k1,
         name: "dfx_test_key".to_string(),
     };
-    let ic_canister_id = "aaaaa-aa";
-    let ic = CanisterId::from_str(&ic_canister_id).unwrap();
 
     let request = SignWithECDSA {
-        message_hash: msg_hash.clone(),
+        message_hash: message.clone(),
         derivation_path: vec![vec![0, 0, 0, 0]],
-        key_id,
+        key_id: key_id.clone(),
     };
-    let (res,): (SignWithECDSAReply,) =
-        ic_cdk::api::call::call_with_payment(ic, "sign_with_ecdsa", (request,), 10_000_000_000)
-            .await
-            .map_err(|e| format!("Failed to call sign_with_ecdsa {}", e.1))
-            .unwrap();
+    let (res,): (SignWithECDSAReply,) = ic_cdk::api::call::call(
+        Principal::management_canister(),
+        "sign_with_ecdsa",
+        (request,),
+    )
+    .await
+    .map_err(|e| format!("Failed to call sign_with_ecdsa {}", e.1))?;
 
-    let signed_tx = sign_tx(res.signature.clone(), hex_raw_tx);
+    let rec_id = get_rec_id(&message, &res.signature, &public_key).unwrap();
 
-    Ok(SignatureReply {
-        sign_tx: signed_tx,
-        signature: res.signature,
-        msg_hash: msg_hash,
-    })
+    let signed_tx = sign_tx(res.signature.clone(), hex_raw_tx, rec_id);
+
+    Ok(SignResponse { sign_tx: signed_tx })
 }
-
 fn get_message_to_sign(hex_raw_tx: Vec<u8>) -> Vec<u8> {
     let mut raw_tx = hex_raw_tx.clone();
 
@@ -126,11 +134,36 @@ fn get_message_to_sign(hex_raw_tx: Vec<u8>) -> Vec<u8> {
 
     let mut decoded_tx = decode_tx(raw_tx.clone());
 
+    decoded_tx[0] = vec![];
+
     decoded_tx[6] = vec![u8::from(1)];
 
     let encoded_tx = encode_tx(decoded_tx);
 
     hash_tx(&encoded_tx)
+}
+
+fn get_rec_id(
+    message: &Vec<u8>,
+    signature: &Vec<u8>,
+    public_key: &Vec<u8>,
+) -> Result<usize, String> {
+    for i in 0..3 {
+        let recovery_id = libsecp256k1::RecoveryId::parse_rpc(27 + i).unwrap();
+
+        let signature_bytes: [u8; 64] = signature[..].try_into().unwrap();
+        let signature_bytes_64 = libsecp256k1::Signature::parse_standard(&signature_bytes).unwrap();
+
+        let message_bytes: [u8; 32] = message[..].try_into().unwrap();
+        let message_bytes_32 = libsecp256k1::Message::parse(&message_bytes);
+
+        let key =
+            libsecp256k1::recover(&message_bytes_32, &signature_bytes_64, &recovery_id).unwrap();
+        if key.serialize_compressed() == public_key[..] {
+            return Ok(i as usize);
+        }
+    }
+    return Err("Not found".to_string());
 }
 
 fn decode_tx(hex_raw_tx: Vec<u8>) -> Vec<Vec<u8>> {
@@ -159,19 +192,15 @@ fn encode_tx(decoded_txt: Vec<Vec<u8>>) -> Vec<u8> {
 }
 
 fn hash_tx(hex_raw_tx: &Vec<u8>) -> Vec<u8> {
-    let mut hasher = Keccak256::new();
+    let keccak256 = easy_hasher::raw_keccak256(hex_raw_tx[..].to_vec());
 
-    hasher.update(&hex_raw_tx[..]);
-
-    let result = hasher.finalize();
-
-    result.to_vec()
+    keccak256.to_vec()
 }
 
-fn sign_tx(signature: Vec<u8>, hex_raw_tx: Vec<u8>) -> Vec<u8> {
+fn sign_tx(signature: Vec<u8>, hex_raw_tx: Vec<u8>, rec_id: usize) -> Vec<u8> {
     let r = &signature[..32];
     let s = &signature[32..];
-    let v = &[u8::from(37)];
+    let v = &[u8::try_from(37 + rec_id).unwrap()];
 
     let removed_last = &hex_raw_tx[0..hex_raw_tx.len() - 3];
 

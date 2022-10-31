@@ -19,9 +19,13 @@
     "@dfinity/agent": "^0.14.0",
     "@dfinity/principal": "^0.14.0",
     "@ethereumjs/tx": "^4.0.0",
+    "@ethersproject/bytes": "^5.7.0",
     "@nomicfoundation/ethereumjs-rlp": "^4.0.0",
     "@nomicfoundation/ethereumjs-util": "^8.0.0",
+    "crypto": "^1.0.1",
     "dotenv": "^16.0.3",
-    "node-fetch": "^2.6.6"
+    "node-fetch": "^2.6.6",
+    "rlp": "^2.2.7",
+    "secp256k1": "^4.0.3"
   }
 }
