@@ -134,9 +134,14 @@ fn get_message_to_sign(hex_raw_tx: Vec<u8>) -> Vec<u8> {
 
     let mut decoded_tx = decode_tx(raw_tx.clone());
 
-    decoded_tx[0] = vec![];
+    decoded_tx[0] = match decoded_tx[0][decoded_tx[0].len() - 1] == 128 {
+        true => vec![],
+        false => vec![decoded_tx[0][decoded_tx[0].len() - 1]],
+    };
 
     decoded_tx[6] = vec![u8::from(1)];
+
+    ic_cdk::println!("{:?}", decoded_tx);
 
     let encoded_tx = encode_tx(decoded_tx);
 
