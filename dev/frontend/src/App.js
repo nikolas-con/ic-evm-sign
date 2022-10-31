@@ -8,23 +8,22 @@ import { ethers } from "ethers";
 const canister = "rrkah-fqaaa-aaaaa-aaaaq-cai";
 
 const idleServiceOptions = (IDL) => {
-  const public_key_info = IDL.Record({
+  const create_user_response = IDL.Record({
     public_key: IDL.Vec(IDL.Nat8),
+    address: IDL.Text,
   });
   const sign_info = IDL.Record({
     sign_tx: IDL.Vec(IDL.Nat8),
-    signature: IDL.Vec(IDL.Nat8),
-    msg_hash: IDL.Vec(IDL.Nat8),
   });
 
   return {
-    get_public_key: IDL.Func(
+    create_user: IDL.Func(
       [],
-      [IDL.Variant({ Ok: public_key_info, Err: IDL.Text })],
+      [IDL.Variant({ Ok: create_user_response, Err: IDL.Text })],
       []
     ),
     sign_evm_tx: IDL.Func(
-      [IDL.Vec(IDL.Nat8)],
+      [IDL.Vec(IDL.Nat8), IDL.Vec(IDL.Nat8)],
       [IDL.Variant({ Ok: sign_info, Err: IDL.Text })],
       []
     ),
@@ -37,8 +36,9 @@ const App = () => {
   const [actor, setActor] = useState(null);
   const [provider, setProvider] = useState(null);
   const [signedTx, setSignedTx] = useState(null);
-  const [senderAddress, setSenderAddress] = useState(null);
-  const [balance, setBalance] = useState(null);
+  const [address, setAddress] = useState(null);
+  const [publicKey, setPublicKey] = useState(null);
+  const [balance, setBalance] = useState(0);
 
   const initICP = useCallback(() => {
     if (!actor) {
@@ -64,19 +64,20 @@ const App = () => {
   const handleSignTx = async (e) => {
     e.preventDefault();
     const transaction = {
-      nonce: 0,
+      nonce: await provider.getTransactionCount(address),
       gasPrice: "0x09184e72a000",
       gasLimit: "0x7530",
       to: e.target.address.value,
       value: ethers.utils.parseEther(e.target.amount.value).toHexString(),
-      data: "0x7f7465737432000000000000000000000000000000000000000000000000000000600057",
+      data: "0x000000000000000000000000000000000000000000000000000000000000000000000000",
     };
+    console.log(transaction);
     const serializeTx = Buffer.from(
       ethers.utils.serializeTransaction(transaction).slice(2) + "808080",
       "hex"
     );
 
-    const res = await actor.sign_evm_tx([...serializeTx]);
+    const res = await actor.sign_evm_tx([...serializeTx], publicKey);
 
     const signedTx = Buffer.from(res.Ok.sign_tx, "hex");
     setSignedTx(signedTx);
@@ -87,16 +88,12 @@ const App = () => {
       "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC"
     );
 
-    const from = ethers.utils.parseTransaction(signedTx).from;
-
     await signer.sendTransaction({
-      value: ethers.utils.parseEther("2"),
-      to: from,
+      value: ethers.utils.parseEther("10"),
+      to: address,
     });
 
-    setSenderAddress(from);
-
-    const balance = await provider.getBalance(from);
+    const balance = await provider.getBalance(address);
 
     setBalance(balance);
   };
@@ -111,9 +108,29 @@ const App = () => {
     alert("yesss");
   };
 
+  const handleCreateUser = async () => {
+    const res = await actor.create_user();
+    const { address, public_key } = res.Ok;
+    const balance = await provider.getBalance(address);
+    console.log(ethers.utils.formatEther(balance));
+    setBalance(ethers.utils.formatEther(balance));
+    setAddress(address);
+    setPublicKey(public_key);
+  };
+
   return (
     <div>
-      {!signedTx ? (
+      {!address ? (
+        <button onClick={handleCreateUser}>Create User</button>
+      ) : balance === "0.0" ? (
+        <>
+          <span>{address}</span>
+          <br />
+          <span>{balance}</span>
+          <br />
+          <button onClick={handleTopUp}>Top up</button>
+        </>
+      ) : !signedTx ? (
         <form onSubmit={handleSignTx}>
           <input name="amount" placeholder="value" value="1" />
           <input
@@ -123,10 +140,8 @@ const App = () => {
           />
           <button type="submit">Create TX</button>
         </form>
-      ) : !senderAddress ? (
-        <button onClick={handleTopUp}>Top up</button>
       ) : (
-        <button onClick={handleSendTx}>Send TX</button>
+        <button onClick={handleSendTx}>Send Transaction</button>
       )}
     </div>
   );
