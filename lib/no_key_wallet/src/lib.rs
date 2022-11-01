@@ -1,13 +1,17 @@
 use crate::rlp::RlpStream;
-use ic_cdk::api::call::CallResult;
+
 use ic_cdk::export::{
     candid::CandidType,
     serde::{Deserialize, Serialize},
     Principal,
 };
+
 use rlp;
 
 use easy_hasher::easy_hasher;
+
+use std::cell::RefCell;
+use std::collections::HashMap;
 
 #[derive(CandidType, Serialize, Debug)]
 pub struct PublicKeyReply {
@@ -16,7 +20,6 @@ pub struct PublicKeyReply {
 
 #[derive(CandidType, Serialize, Debug)]
 pub struct CreateResponse {
-    pub public_key: Vec<u8>,
     pub address: String,
 }
 #[derive(CandidType, Deserialize, Debug)]
@@ -61,18 +64,64 @@ pub enum EcdsaCurve {
     #[serde(rename = "secp256k1")]
     Secp256k1,
 }
-use std::str::FromStr;
-use std::vec;
+#[derive(CandidType, Serialize, Debug, Clone, Deserialize)]
+pub struct Transaction {
+    pub data: Vec<u8>,
+    pub timestamp: u64,
+}
+impl Default for Transaction {
+    fn default() -> Self {
+        Transaction {
+            data: vec![],
+            timestamp: u64::from(0 as u64),
+        }
+    }
+}
 
-pub async fn create() -> Result<CreateResponse, String> {
+#[derive(Clone, Debug, CandidType, Deserialize)]
+pub struct User {
+    pub public_key: Vec<u8>,
+    pub transactions: Vec<Transaction>,
+}
+
+impl Default for User {
+    fn default() -> Self {
+        User {
+            public_key: vec![],
+            transactions: vec![],
+        }
+    }
+}
+
+#[derive(Default, CandidType, Deserialize, Debug)]
+pub struct State {
+    users: HashMap<Principal, User>,
+}
+
+thread_local! {
+    static STATE: RefCell<State> = RefCell::new(State::default());
+}
+
+pub async fn create(principal_id: Principal) -> Result<CreateResponse, String> {
+    // let wallets = STATE.with(|s| s.borrow().wallets.clone());
+    // let existing_wallet = match wallets.get(&principal_id) {
+    //     Some(_) => true,
+    //     None => false,
+    // };
+    // if existing_wallet {
+    //     return Err(String::from("this wallet already exist"));
+    // }
+
     let key_id = EcdsaKeyId {
         curve: EcdsaCurve::Secp256k1,
         name: "dfx_test_key".to_string(),
     };
 
+    let caller = get_derivation_path(principal_id);
+
     let request = ECDSAPublicKey {
         canister_id: None,
-        derivation_path: vec![vec![0, 0, 0, 0]],
+        derivation_path: vec![caller],
         key_id: key_id.clone(),
     };
     let (res,): (ECDSAPublicKeyReply,) = ic_cdk::call(
@@ -92,13 +141,36 @@ pub async fn create() -> Result<CreateResponse, String> {
     let keccak256_hex = keccak256.to_hex_string();
     let address: String = "0x".to_owned() + &keccak256_hex[24..];
 
-    Ok(CreateResponse {
-        address,
-        public_key: res.public_key,
-    })
+    let mut user = User::default();
+    user.public_key = res.public_key;
+
+    STATE.with(|s| {
+        let mut state = s.borrow_mut();
+        state.users.insert(principal_id, user);
+    });
+
+    Ok(CreateResponse { address })
 }
 
-pub async fn sign(hex_raw_tx: Vec<u8>, public_key: Vec<u8>) -> Result<SignResponse, String> {
+pub fn get_all_users() -> Vec<User> {
+    let state = STATE.with(|s| {
+        let users = s.borrow_mut().users.clone();
+        users.clone()
+    });
+
+    let mut users: Vec<User> = Vec::new();
+
+    for (_, user) in state.iter() {
+        users.push(user.clone());
+    }
+
+    users
+}
+
+pub async fn sign(hex_raw_tx: Vec<u8>, principal_id: Principal) -> Result<SignResponse, String> {
+    let users = STATE.with(|s| s.borrow().users.clone());
+    let user = users.get(&principal_id).unwrap();
+
     let message = get_message_to_sign(hex_raw_tx.clone());
 
     assert!(message.len() == 32);
@@ -108,9 +180,11 @@ pub async fn sign(hex_raw_tx: Vec<u8>, public_key: Vec<u8>) -> Result<SignRespon
         name: "dfx_test_key".to_string(),
     };
 
+    let caller = get_derivation_path(principal_id);
+
     let request = SignWithECDSA {
         message_hash: message.clone(),
-        derivation_path: vec![vec![0, 0, 0, 0]],
+        derivation_path: vec![caller],
         key_id: key_id.clone(),
     };
     let (res,): (SignWithECDSAReply,) = ic_cdk::api::call::call(
@@ -121,11 +195,24 @@ pub async fn sign(hex_raw_tx: Vec<u8>, public_key: Vec<u8>) -> Result<SignRespon
     .await
     .map_err(|e| format!("Failed to call sign_with_ecdsa {}", e.1))?;
 
-    let rec_id = get_rec_id(&message, &res.signature, &public_key).unwrap();
+    let rec_id = get_rec_id(&message, &res.signature, &user.public_key).unwrap();
 
     let signed_tx = sign_tx(res.signature.clone(), hex_raw_tx, rec_id);
 
+    STATE.with(|s| {
+        let mut state = s.borrow_mut();
+        let mut user = state.users.get_mut(&principal_id).unwrap();
+        let mut tx = Transaction::default();
+        tx.data = signed_tx.clone();
+        tx.timestamp = ic_cdk::api::time();
+        user.transactions.push(tx);
+    });
+
     Ok(SignResponse { sign_tx: signed_tx })
+}
+
+fn get_derivation_path(caller: Principal) -> Vec<u8> {
+    caller.as_slice().to_vec()
 }
 fn get_message_to_sign(hex_raw_tx: Vec<u8>) -> Vec<u8> {
     let mut raw_tx = hex_raw_tx.clone();
@@ -140,8 +227,6 @@ fn get_message_to_sign(hex_raw_tx: Vec<u8>) -> Vec<u8> {
     };
 
     decoded_tx[6] = vec![u8::from(1)];
-
-    ic_cdk::println!("{:?}", decoded_tx);
 
     let encoded_tx = encode_tx(decoded_tx);
 
