@@ -6,6 +6,11 @@
       "type": "rust",
       "package": "backend",
       "candid": "dev/backend/backend.did"
+    },
+    "identity": {
+      "type": "custom",
+      "candid": "dev/frontend/canisters/identity/identity.did",
+      "wasm": "dev/frontend/canisters/identity/identity.wasm"
     }
   },
   "defaults": {
