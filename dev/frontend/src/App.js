@@ -8,8 +8,7 @@ import { ethers } from "ethers";
 const canister = "rrkah-fqaaa-aaaaa-aaaaq-cai";
 
 const idleServiceOptions = (IDL) => {
-  const create_user_response = IDL.Record({
-    public_key: IDL.Vec(IDL.Nat8),
+  const create_response = IDL.Record({
     address: IDL.Text,
   });
   const sign_info = IDL.Record({
@@ -17,13 +16,13 @@ const idleServiceOptions = (IDL) => {
   });
 
   return {
-    create_user: IDL.Func(
+    create: IDL.Func(
       [],
-      [IDL.Variant({ Ok: create_user_response, Err: IDL.Text })],
+      [IDL.Variant({ Ok: create_response, Err: IDL.Text })],
       []
     ),
     sign_evm_tx: IDL.Func(
-      [IDL.Vec(IDL.Nat8), IDL.Vec(IDL.Nat8)],
+      [IDL.Vec(IDL.Nat8)],
       [IDL.Variant({ Ok: sign_info, Err: IDL.Text })],
       []
     ),
@@ -37,8 +36,8 @@ const App = () => {
   const [provider, setProvider] = useState(null);
   const [signedTx, setSignedTx] = useState(null);
   const [address, setAddress] = useState(null);
-  const [publicKey, setPublicKey] = useState(null);
-  const [balance, setBalance] = useState(0);
+  const [balance, setBalance] = useState(null);
+  const [stage, setStage] = useState("");
 
   const initICP = useCallback(() => {
     if (!actor) {
@@ -71,16 +70,30 @@ const App = () => {
       value: ethers.utils.parseEther(e.target.amount.value).toHexString(),
       data: "0x000000000000000000000000000000000000000000000000000000000000000000000000",
     };
-    console.log(transaction);
+
     const serializeTx = Buffer.from(
       ethers.utils.serializeTransaction(transaction).slice(2) + "808080",
       "hex"
     );
 
-    const res = await actor.sign_evm_tx([...serializeTx], publicKey);
+    setStage("signing transaction...");
+    const res = await actor.sign_evm_tx([...serializeTx]);
 
     const signedTx = Buffer.from(res.Ok.sign_tx, "hex");
+
+    setStage("send transaction...");
+    const { hash } = await provider.sendTransaction(
+      "0x" + signedTx.toString("hex")
+    );
+
+    setStage("wait for verification ...");
+    await provider.waitForTransaction(hash);
+    setStage(hash);
+
     setSignedTx(signedTx);
+
+    const balance = await provider.getBalance(address);
+    setBalance(ethers.utils.formatEther(balance));
   };
 
   const handleTopUp = async () => {
@@ -95,42 +108,29 @@ const App = () => {
 
     const balance = await provider.getBalance(address);
 
-    setBalance(balance);
+    setBalance(ethers.utils.formatEther(balance));
   };
 
-  const handleSendTx = async () => {
-    const { hash } = await provider.sendTransaction(
-      "0x" + signedTx.toString("hex")
-    );
-
-    await provider.waitForTransaction(hash);
-
-    alert("yesss");
-  };
-
-  const handleCreateUser = async () => {
-    const res = await actor.create_user();
-    const { address, public_key } = res.Ok;
+  const handleCreateEVMWallet = async () => {
+    const res = await actor.create();
+    const { address } = res.Ok;
     const balance = await provider.getBalance(address);
-    console.log(ethers.utils.formatEther(balance));
     setBalance(ethers.utils.formatEther(balance));
     setAddress(address);
-    setPublicKey(public_key);
   };
 
   return (
     <div>
+      {address && <span>{address}</span>}
+      <br />
+      {balance && <span>{balance}</span>}
       {!address ? (
-        <button onClick={handleCreateUser}>Create User</button>
+        <button onClick={handleCreateEVMWallet}>Create EVM Wallet</button>
       ) : balance === "0.0" ? (
-        <>
-          <span>{address}</span>
-          <br />
-          <span>{balance}</span>
-          <br />
+        <div>
           <button onClick={handleTopUp}>Top up</button>
-        </>
-      ) : !signedTx ? (
+        </div>
+      ) : (
         <form onSubmit={handleSignTx}>
           <input name="amount" placeholder="value" value="1" />
           <input
@@ -138,11 +138,12 @@ const App = () => {
             placeholder="To address"
             value="0x1CBd3b2770909D4e10f157cABC84C7264073C9Ec"
           />
-          <button type="submit">Create TX</button>
+          <button type="submit">Send ETH</button>
         </form>
-      ) : (
-        <button onClick={handleSendTx}>Send Transaction</button>
       )}
+      <div>
+        <span>{stage}</span>
+      </div>
     </div>
   );
 };

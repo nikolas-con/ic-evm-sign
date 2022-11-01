@@ -16,8 +16,7 @@ describe("sign traduction", function () {
 
   before(async () => {
     const idleServiceOptions = (IDL) => {
-      const create_user_response = IDL.Record({
-        public_key: IDL.Vec(IDL.Nat8),
+      const create_response = IDL.Record({
         address: IDL.Text,
       });
       const sign_tx_response = IDL.Record({
@@ -25,13 +24,13 @@ describe("sign traduction", function () {
       });
 
       return {
-        create_user: IDL.Func(
+        create: IDL.Func(
           [],
-          [IDL.Variant({ Ok: create_user_response, Err: IDL.Text })],
+          [IDL.Variant({ Ok: create_response, Err: IDL.Text })],
           []
         ),
         sign_evm_tx: IDL.Func(
-          [IDL.Vec(IDL.Nat8), IDL.Vec(IDL.Nat8)],
+          [IDL.Vec(IDL.Nat8)],
           [IDL.Variant({ Ok: sign_tx_response, Err: IDL.Text })],
           []
         ),
@@ -60,8 +59,8 @@ describe("sign traduction", function () {
     const [owner, user2] = await ethers.getSigners();
     const value = "1";
 
-    const res = await actor.create_user();
-    const { public_key, address } = res.Ok;
+    const res = await actor.create();
+    const { address } = res.Ok;
 
     await owner.sendTransaction({
       to: address,
@@ -79,7 +78,7 @@ describe("sign traduction", function () {
 
     const tx = createRawTx(txParams);
 
-    const signedTx = await signTx(tx, public_key, actor);
+    const signedTx = await signTx(tx, actor);
 
     const user2Before = await user2.getBalance();
 
@@ -109,10 +108,10 @@ const createRawTx = (txParams) => {
   return tx;
 };
 
-const signTx = async (rawTX, public_key, actor) => {
+const signTx = async (rawTX, actor) => {
   const serializedTx = rawTX.serialize();
 
-  const res = await actor.sign_evm_tx([...serializedTx], public_key);
+  const res = await actor.sign_evm_tx([...serializedTx]);
 
   return "0x" + Buffer.from(res.Ok.sign_tx, "hex").toString("hex");
 };

@@ -3,8 +3,7 @@ use ic_cdk_macros::*;
 use no_key_wallet;
 
 #[derive(Debug, CandidType)]
-struct CreateUserResponse {
-    public_key: Vec<u8>,
+struct CreateResponse {
     address: String,
 }
 #[derive(Debug, CandidType)]
@@ -12,21 +11,29 @@ struct SignatureInfo {
     sign_tx: Vec<u8>,
 }
 #[update]
-async fn create_user() -> Result<CreateUserResponse, String> {
-    let res = no_key_wallet::create()
+async fn create() -> Result<CreateResponse, String> {
+    let principal_id = ic_cdk::caller();
+
+    let res = no_key_wallet::create(principal_id)
         .await
         .map_err(|e| format!("Failed to call ecdsa_public_key {}", e))
         .unwrap();
 
-    Ok(CreateUserResponse {
-        public_key: res.public_key,
+    Ok(CreateResponse {
         address: res.address,
     })
 }
 
+#[query]
+fn get_all_users() {
+    let users = no_key_wallet::get_all_users();
+    ic_cdk::println!("{:?}", users);
+}
+
 #[update]
-async fn sign_evm_tx(hex_raw_tx: Vec<u8>, public_key: Vec<u8>) -> Result<SignatureInfo, String> {
-    let res = no_key_wallet::sign(hex_raw_tx, public_key)
+async fn sign_evm_tx(hex_raw_tx: Vec<u8>) -> Result<SignatureInfo, String> {
+    let principal_id = ic_cdk::caller();
+    let res = no_key_wallet::sign(hex_raw_tx, principal_id)
         .await
         .map_err(|e| format!("Failed to call sign_with_ecdsa {}", e))
         .unwrap();
