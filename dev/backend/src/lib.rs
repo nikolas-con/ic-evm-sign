@@ -10,6 +10,17 @@ struct CreateResponse {
 struct SignatureInfo {
     sign_tx: Vec<u8>,
 }
+
+#[derive(Debug, CandidType)]
+struct CallerTransactionsResponse {
+    transactions: Vec<no_key_wallet::Transaction>,
+}
+#[derive(Debug, CandidType)]
+struct CallerResponse {
+    address: String,
+    transactions: Vec<no_key_wallet::Transaction>,
+}
+
 #[update]
 async fn create() -> Result<CreateResponse, String> {
     let principal_id = ic_cdk::caller();
@@ -24,12 +35,6 @@ async fn create() -> Result<CreateResponse, String> {
     })
 }
 
-#[query]
-fn get_all_users() {
-    let users = no_key_wallet::get_all_users();
-    ic_cdk::println!("{:?}", users);
-}
-
 #[update]
 async fn sign_evm_tx(hex_raw_tx: Vec<u8>) -> Result<SignatureInfo, String> {
     let principal_id = ic_cdk::caller();
@@ -40,6 +45,31 @@ async fn sign_evm_tx(hex_raw_tx: Vec<u8>) -> Result<SignatureInfo, String> {
 
     Ok(SignatureInfo {
         sign_tx: res.sign_tx,
+    })
+}
+
+#[update]
+fn clear_caller_history() -> Result<(), String> {
+    let principal_id = ic_cdk::caller();
+
+    let res = no_key_wallet::clear_caller_history(principal_id)
+        .map_err(|e| format!("Failed to call clear_caller_history {}", e))
+        .unwrap();
+
+    Ok(res)
+}
+
+#[query]
+fn get_caller_data() -> Result<CallerResponse, String> {
+    let principal_id = ic_cdk::caller();
+
+    let res = no_key_wallet::get_caller_data(principal_id)
+        .map_err(|e| format!("Failed to call get_caller_data {}", e))
+        .unwrap();
+
+    Ok(CallerResponse {
+        address: res.address,
+        transactions: res.transactions,
     })
 }
 

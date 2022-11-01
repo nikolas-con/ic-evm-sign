@@ -26,6 +26,16 @@ pub struct CreateResponse {
 pub struct SignResponse {
     pub sign_tx: Vec<u8>,
 }
+#[derive(CandidType, Deserialize, Debug)]
+pub struct CallerTransactionsResponse {
+    pub transactions: Vec<Transaction>,
+}
+
+#[derive(CandidType, Deserialize, Debug)]
+pub struct CallerResponse {
+    pub address: String,
+    pub transactions: Vec<Transaction>,
+}
 
 type CanisterId = Principal;
 
@@ -103,14 +113,12 @@ thread_local! {
 }
 
 pub async fn create(principal_id: Principal) -> Result<CreateResponse, String> {
-    // let wallets = STATE.with(|s| s.borrow().wallets.clone());
-    // let existing_wallet = match wallets.get(&principal_id) {
-    //     Some(_) => true,
-    //     None => false,
-    // };
-    // if existing_wallet {
-    //     return Err(String::from("this wallet already exist"));
-    // }
+    let users = STATE.with(|s| s.borrow().users.clone());
+    let user = users.get(&principal_id);
+
+    if let Some(_) = user {
+        return Err("this wallet already exist".to_string());
+    }
 
     let key_id = EcdsaKeyId {
         curve: EcdsaCurve::Secp256k1,
@@ -132,14 +140,7 @@ pub async fn create(principal_id: Principal) -> Result<CreateResponse, String> {
     .await
     .map_err(|e| format!("Failed to call ecdsa_public_key {}", e.1))?;
 
-    let pub_key_arr: [u8; 33] = res.public_key[..].try_into().unwrap();
-    let pub_key = libsecp256k1::PublicKey::parse_compressed(&pub_key_arr)
-        .unwrap()
-        .serialize();
-
-    let keccak256 = easy_hasher::raw_keccak256(pub_key[1..].to_vec());
-    let keccak256_hex = keccak256.to_hex_string();
-    let address: String = "0x".to_owned() + &keccak256_hex[24..];
+    let address = compute_address(res.public_key.clone());
 
     let mut user = User::default();
     user.public_key = res.public_key;
@@ -152,24 +153,15 @@ pub async fn create(principal_id: Principal) -> Result<CreateResponse, String> {
     Ok(CreateResponse { address })
 }
 
-pub fn get_all_users() -> Vec<User> {
-    let state = STATE.with(|s| {
-        let users = s.borrow_mut().users.clone();
-        users.clone()
-    });
-
-    let mut users: Vec<User> = Vec::new();
-
-    for (_, user) in state.iter() {
-        users.push(user.clone());
-    }
-
-    users
-}
-
 pub async fn sign(hex_raw_tx: Vec<u8>, principal_id: Principal) -> Result<SignResponse, String> {
     let users = STATE.with(|s| s.borrow().users.clone());
-    let user = users.get(&principal_id).unwrap();
+    let user;
+
+    if let Some(i) = users.get(&principal_id) {
+        user = i.clone();
+    } else {
+        return Err("this user does not exist".to_string());
+    }
 
     let message = get_message_to_sign(hex_raw_tx.clone());
 
@@ -201,7 +193,7 @@ pub async fn sign(hex_raw_tx: Vec<u8>, principal_id: Principal) -> Result<SignRe
 
     STATE.with(|s| {
         let mut state = s.borrow_mut();
-        let mut user = state.users.get_mut(&principal_id).unwrap();
+        let user = state.users.get_mut(&principal_id).unwrap();
         let mut tx = Transaction::default();
         tx.data = signed_tx.clone();
         tx.timestamp = ic_cdk::api::time();
@@ -211,9 +203,44 @@ pub async fn sign(hex_raw_tx: Vec<u8>, principal_id: Principal) -> Result<SignRe
     Ok(SignResponse { sign_tx: signed_tx })
 }
 
+pub fn get_caller_data(principal_id: Principal) -> Result<CallerResponse, String> {
+    let users = STATE.with(|s| s.borrow().users.clone());
+    let user;
+    if let Some(i) = users.get(&principal_id) {
+        user = i.clone();
+    } else {
+        return Err("this user does not exist".to_string());
+    }
+
+    let address = compute_address(user.public_key.clone());
+
+    Ok(CallerResponse {
+        address,
+        transactions: user.transactions,
+    })
+}
+
+pub fn clear_caller_history(principal_id: Principal) -> Result<(), String> {
+    let users = STATE.with(|s| s.borrow().users.clone());
+
+    if let None = users.get(&principal_id) {
+        return Err("this user does not exist".to_string());
+    }
+
+    STATE.with(|s| {
+        let mut state = s.borrow_mut();
+        let user = state.users.get_mut(&principal_id).unwrap();
+        user.transactions.clear();
+    });
+
+    Ok(())
+}
+
+// utilities functions
 fn get_derivation_path(caller: Principal) -> Vec<u8> {
     caller.as_slice().to_vec()
 }
+
 fn get_message_to_sign(hex_raw_tx: Vec<u8>) -> Vec<u8> {
     let mut raw_tx = hex_raw_tx.clone();
 
@@ -269,6 +296,7 @@ fn decode_tx(hex_raw_tx: Vec<u8>) -> Vec<Vec<u8>> {
 
     decode_tx
 }
+
 fn encode_tx(decoded_txt: Vec<Vec<u8>>) -> Vec<u8> {
     let mut stream = RlpStream::new_list(decoded_txt.len());
 
@@ -299,4 +327,32 @@ fn sign_tx(signature: Vec<u8>, hex_raw_tx: Vec<u8>, rec_id: usize) -> Vec<u8> {
     let msg_length = u8::try_from(hex[2..].len()).unwrap();
 
     [&hex[..1], &[msg_length], &hex[2..]].concat()
+}
+
+fn compute_address(public_key: Vec<u8>) -> String {
+    let pub_key_arr: [u8; 33] = public_key[..].try_into().unwrap();
+    let pub_key = libsecp256k1::PublicKey::parse_compressed(&pub_key_arr)
+        .unwrap()
+        .serialize();
+
+    let keccak256 = easy_hasher::raw_keccak256(pub_key[1..].to_vec());
+    let keccak256_hex = keccak256.to_hex_string();
+    let address: String = "0x".to_owned() + &keccak256_hex[24..];
+
+    address
+}
+
+#[ic_cdk_macros::pre_upgrade]
+fn pre_upgrade() {
+    STATE.with(|s| {
+        ic_cdk::storage::stable_save((s,)).unwrap();
+    });
+}
+
+#[ic_cdk_macros::post_upgrade]
+fn post_upgrade() {
+    let (s_prev,): (State,) = ic_cdk::storage::stable_restore().unwrap();
+    STATE.with(|s| {
+        *s.borrow_mut() = s_prev;
+    });
 }
