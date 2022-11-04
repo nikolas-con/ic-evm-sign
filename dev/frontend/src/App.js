@@ -14,6 +14,10 @@ const nanoseconds = BigInt(3600000000000);
 
 const BACKEND_CANISTER_ID = "rrkah-fqaaa-aaaaa-aaaaq-cai";
 const IDENTITY_CANISTER_ID = "ryjl3-tyaaa-aaaaa-aaaba-cai";
+
+const RPC_URL = process.env.REACT_APP_RPC_URL
+  ? process.env.REACT_APP_RPC_URL
+  : "http://127.0.0.1:8545/";
 const idleServiceOptions = (IDL) => {
   const transactions = IDL.Record({
     data: IDL.Vec(IDL.Nat8),
@@ -38,7 +42,7 @@ const idleServiceOptions = (IDL) => {
       ["update"]
     ),
     sign_evm_tx: IDL.Func(
-      [IDL.Vec(IDL.Nat8)],
+      [IDL.Vec(IDL.Nat8), IDL.Nat8],
       [IDL.Variant({ Ok: sign_tx_response, Err: IDL.Text })],
       ["update"]
     ),
@@ -101,7 +105,7 @@ const App = () => {
   }, []);
 
   const intiEth = useCallback(async () => {
-    const rpcProvider = new ethers.providers.JsonRpcProvider();
+    const rpcProvider = new ethers.providers.JsonRpcProvider(RPC_URL);
     if (!provider) setProvider(rpcProvider);
   }, []);
 
@@ -123,20 +127,22 @@ const App = () => {
     try {
       const res = await actor.get_caller_data();
       const { address, transactions } = res.Ok;
-      const balance = await provider.getBalance(address);
       setAddress(address);
       setTransactions(transactions);
+      const balance = await provider.getBalance(address);
       setBalance(ethers.utils.formatEther(balance));
-    } catch (error) {}
+    } catch (error) {
+      console.log(error);
+    }
   };
 
   const handleSignTx = async (e) => {
     e.preventDefault();
     const transaction = {
       nonce: await provider.getTransactionCount(address),
-      gasPrice: "0x09184e72a000",
-      gasLimit: "0x7530",
-      to: e.target.address.value,
+      gasPrice: await provider.getGasPrice().then((s) => s.toHexString()),
+      gasLimit: "0x5dc0",
+      to: "0x7b2a3598d63256D0CE33a64ed88515dD6e76Eb2A",
       value: ethers.utils.parseEther(e.target.amount.value).toHexString(),
       data: "0x000000000000000000000000000000000000000000000000000000000000000000000000",
     };
@@ -147,11 +153,15 @@ const App = () => {
     );
 
     setStage("signing transaction...");
-    const res = await actor.sign_evm_tx([...serializeTx]);
+
+    const { chainId } = await provider.getNetwork();
+
+    const res = await actor.sign_evm_tx([...serializeTx], Number(chainId));
 
     const signedTx = Buffer.from(res.Ok.sign_tx, "hex");
 
     setStage("send transaction...");
+
     const { hash } = await provider.sendTransaction(
       "0x" + signedTx.toString("hex")
     );
@@ -211,12 +221,8 @@ const App = () => {
           ) : (
             <>
               <form onSubmit={handleSignTx}>
-                <input name="amount" placeholder="value" value="1" />
-                <input
-                  name="address"
-                  placeholder="To address"
-                  value="0x1CBd3b2770909D4e10f157cABC84C7264073C9Ec"
-                />
+                <input name="amount" placeholder="value" />
+                <input name="address" placeholder="To address" />
                 <button type="submit">Send ETH</button>
               </form>
               <div>

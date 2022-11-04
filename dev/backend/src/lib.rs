@@ -36,9 +36,9 @@ async fn create() -> Result<CreateResponse, String> {
 }
 
 #[update]
-async fn sign_evm_tx(hex_raw_tx: Vec<u8>) -> Result<SignatureInfo, String> {
+async fn sign_evm_tx(hex_raw_tx: Vec<u8>, chain_id: u8) -> Result<SignatureInfo, String> {
     let principal_id = ic_cdk::caller();
-    let res = no_key_wallet::sign(hex_raw_tx, principal_id)
+    let res = no_key_wallet::sign(hex_raw_tx, chain_id, principal_id)
         .await
         .map_err(|e| format!("Failed to call sign_with_ecdsa {}", e))
         .unwrap();

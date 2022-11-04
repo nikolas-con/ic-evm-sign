@@ -16,11 +16,19 @@ describe("sign traduction", function () {
 
   before(async () => {
     const idleServiceOptions = (IDL) => {
+      const transactions = IDL.Record({
+        data: IDL.Vec(IDL.Nat8),
+        timestamp: IDL.Nat64,
+      });
       const create_response = IDL.Record({
         address: IDL.Text,
       });
       const sign_tx_response = IDL.Record({
         sign_tx: IDL.Vec(IDL.Nat8),
+      });
+      const caller_response = IDL.Record({
+        address: IDL.Text,
+        transactions: IDL.Vec(transactions),
       });
 
       return {
@@ -30,9 +38,14 @@ describe("sign traduction", function () {
           []
         ),
         sign_evm_tx: IDL.Func(
-          [IDL.Vec(IDL.Nat8)],
+          [IDL.Vec(IDL.Nat8), IDL.Nat8],
           [IDL.Variant({ Ok: sign_tx_response, Err: IDL.Text })],
           []
+        ),
+        get_caller_data: IDL.Func(
+          [],
+          [IDL.Variant({ Ok: caller_response, Err: IDL.Text })],
+          ["query"]
         ),
       };
     };
@@ -58,9 +71,14 @@ describe("sign traduction", function () {
   it("sign traduction e2e", async function () {
     const [owner, user2] = await ethers.getSigners();
     const value = "1";
-
-    const res = await actor.create();
-    const { address } = res.Ok;
+    let address;
+    try {
+      const res = await actor.create();
+      address = res.Ok.address;
+    } catch (error) {
+      const res = await actor.get_caller_data();
+      address = res.Ok.address;
+    }
 
     await owner.sendTransaction({
       to: address,
@@ -110,8 +128,9 @@ const createRawTx = (txParams) => {
 
 const signTx = async (rawTX, actor) => {
   const serializedTx = rawTX.serialize();
+  const { chainId } = await ethers.provider.getNetwork();
 
-  const res = await actor.sign_evm_tx([...serializedTx]);
+  const res = await actor.sign_evm_tx([...serializedTx], Number(chainId));
 
   return "0x" + Buffer.from(res.Ok.sign_tx, "hex").toString("hex");
 };

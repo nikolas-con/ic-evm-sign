@@ -153,7 +153,11 @@ pub async fn create(principal_id: Principal) -> Result<CreateResponse, String> {
     Ok(CreateResponse { address })
 }
 
-pub async fn sign(hex_raw_tx: Vec<u8>, principal_id: Principal) -> Result<SignResponse, String> {
+pub async fn sign(
+    hex_raw_tx: Vec<u8>,
+    chain_id: u8,
+    principal_id: Principal,
+) -> Result<SignResponse, String> {
     let users = STATE.with(|s| s.borrow().users.clone());
     let user;
 
@@ -163,7 +167,7 @@ pub async fn sign(hex_raw_tx: Vec<u8>, principal_id: Principal) -> Result<SignRe
         return Err("this user does not exist".to_string());
     }
 
-    let message = get_message_to_sign(hex_raw_tx.clone());
+    let message = get_message_to_sign(hex_raw_tx.clone(), &chain_id);
 
     assert!(message.len() == 32);
 
@@ -189,7 +193,7 @@ pub async fn sign(hex_raw_tx: Vec<u8>, principal_id: Principal) -> Result<SignRe
 
     let rec_id = get_rec_id(&message, &res.signature, &user.public_key).unwrap();
 
-    let signed_tx = sign_tx(res.signature.clone(), hex_raw_tx, rec_id);
+    let signed_tx = sign_tx(res.signature.clone(), hex_raw_tx, chain_id, rec_id);
 
     STATE.with(|s| {
         let mut state = s.borrow_mut();
@@ -241,7 +245,7 @@ fn get_derivation_path(caller: Principal) -> Vec<u8> {
     caller.as_slice().to_vec()
 }
 
-fn get_message_to_sign(hex_raw_tx: Vec<u8>) -> Vec<u8> {
+fn get_message_to_sign(hex_raw_tx: Vec<u8>, chain_id: &u8) -> Vec<u8> {
     let mut raw_tx = hex_raw_tx.clone();
 
     raw_tx.insert(0, 0x83);
@@ -253,7 +257,7 @@ fn get_message_to_sign(hex_raw_tx: Vec<u8>) -> Vec<u8> {
         false => vec![decoded_tx[0][decoded_tx[0].len() - 1]],
     };
 
-    decoded_tx[6] = vec![u8::from(1)];
+    decoded_tx[6] = vec![u8::from(chain_id.clone())];
 
     let encoded_tx = encode_tx(decoded_tx);
 
@@ -315,10 +319,10 @@ fn hash_tx(hex_raw_tx: &Vec<u8>) -> Vec<u8> {
     keccak256.to_vec()
 }
 
-fn sign_tx(signature: Vec<u8>, hex_raw_tx: Vec<u8>, rec_id: usize) -> Vec<u8> {
+fn sign_tx(signature: Vec<u8>, hex_raw_tx: Vec<u8>, chain_id: u8, rec_id: usize) -> Vec<u8> {
     let r = &signature[..32];
     let s = &signature[32..];
-    let v = &[u8::try_from(37 + rec_id).unwrap()];
+    let v = &[u8::try_from(chain_id * 2 + 35 + u8::try_from(rec_id).unwrap()).unwrap()];
 
     let removed_last = &hex_raw_tx[0..hex_raw_tx.len() - 3];
 
