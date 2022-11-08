@@ -1,16 +1,22 @@
 use crate::rlp::RlpStream;
-
+#[cfg(test)]
+use crate::tests::{ic_call, ic_timestamp};
+#[cfg(not(test))]
+use ic_cdk::api::time as ic_timestamp;
+#[cfg(not(test))]
+use ic_cdk::call as ic_call;
 use ic_cdk::export::{
     candid::CandidType,
     serde::{Deserialize, Serialize},
     Principal,
 };
-
 use rlp;
 
 use easy_hasher::easy_hasher;
 
 use std::cell::RefCell;
+
+use libsecp256k1;
 use std::collections::HashMap;
 
 #[derive(CandidType, Serialize, Debug)]
@@ -132,7 +138,8 @@ pub async fn create(principal_id: Principal) -> Result<CreateResponse, String> {
         derivation_path: vec![caller],
         key_id: key_id.clone(),
     };
-    let (res,): (ECDSAPublicKeyReply,) = ic_cdk::call(
+
+    let (res,): (ECDSAPublicKeyReply,) = ic_call(
         Principal::management_canister(),
         "ecdsa_public_key",
         (request,),
@@ -183,7 +190,7 @@ pub async fn sign(
         derivation_path: vec![caller],
         key_id: key_id.clone(),
     };
-    let (res,): (SignWithECDSAReply,) = ic_cdk::api::call::call(
+    let (res,): (SignWithECDSAReply,) = ic_call(
         Principal::management_canister(),
         "sign_with_ecdsa",
         (request,),
@@ -191,7 +198,12 @@ pub async fn sign(
     .await
     .map_err(|e| format!("Failed to call sign_with_ecdsa {}", e.1))?;
 
+    ic_cdk::println!("signature {:?}", res.signature);
     let rec_id = get_rec_id(&message, &res.signature, &user.public_key).unwrap();
+
+    ic_cdk::println!("pub_key {:?}", user.public_key);
+
+    ic_cdk::println!("hex_raw_tx {:?}\n", hex_raw_tx);
 
     let signed_tx = sign_tx(res.signature.clone(), hex_raw_tx, chain_id, rec_id);
 
@@ -200,7 +212,7 @@ pub async fn sign(
         let user = state.users.get_mut(&principal_id).unwrap();
         let mut tx = Transaction::default();
         tx.data = signed_tx.clone();
-        tx.timestamp = ic_cdk::api::time();
+        tx.timestamp = ic_timestamp();
         user.transactions.push(tx);
     });
 
@@ -359,4 +371,112 @@ fn post_upgrade() {
     STATE.with(|s| {
         *s.borrow_mut() = s_prev;
     });
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    use candid::de::IDLDeserialize;
+    use candid::utils::{ArgumentDecoder, ArgumentEncoder};
+    use candid::{Decode, Encode};
+    use ic_cdk::api::call::{CallResult, RejectionCode};
+    use libsecp256k1::{PublicKey, SecretKey};
+    use rand::{thread_rng, RngCore};
+    use std::future::Future;
+
+    pub struct State {
+        private_key: SecretKey,
+    }
+
+    thread_local! {
+        static STATE_TEST: RefCell<State> = RefCell::new(State { private_key: SecretKey::default() });
+    }
+    use futures::executor::block_on;
+
+    pub fn ic_timestamp() -> u64 {
+        u64::from(1667817318 as u64)
+    }
+
+    pub fn ic_call<T: ArgumentEncoder, R: for<'a> ArgumentDecoder<'a>>(
+        id: Principal,
+        method: &str,
+        args: T,
+    ) -> impl Future<Output = CallResult<R>> + '_ {
+        async move {
+            if method == "ecdsa_public_key" {
+                let private_key = generate_random_private_key();
+
+                STATE_TEST.with(|s| {
+                    let mut state = s.borrow_mut();
+
+                    state.private_key = private_key;
+                });
+
+                let public_key = PublicKey::from_secret_key(&private_key).serialize_compressed();
+
+                let obj = ECDSAPublicKeyReply {
+                    public_key: public_key.to_vec(),
+                    chain_code: vec![0, 1],
+                };
+
+                let bytes = Encode!(&obj).unwrap();
+                let mut de = IDLDeserialize::new(&bytes).unwrap();
+                let res: R = ArgumentDecoder::decode(&mut de).unwrap();
+                return Ok(res);
+            }
+            if method == "sign_with_ecdsa" {
+                let private_key = STATE_TEST.with(|s| s.borrow().private_key);
+
+                return Err((RejectionCode::CanisterReject, String::from("no method")));
+            } else {
+                return Err((RejectionCode::CanisterReject, String::from("no method")));
+            }
+        }
+    }
+
+    fn generate_random_private_key() -> SecretKey {
+        let mut rng = thread_rng();
+
+        loop {
+            let mut ret = [0u8; 32];
+            rng.fill_bytes(&mut ret);
+            if let Ok(key) = SecretKey::parse(&ret) {
+                return key;
+            }
+        }
+    }
+    #[test]
+    fn create_new_user() {
+        let text = "aaaaa-aa";
+        let principal_id = Principal::from_text(text).unwrap();
+
+        let res = block_on(create(principal_id)).unwrap();
+        assert_eq!(42, res.address.len());
+    }
+    #[test]
+    #[ignore]
+    fn sign_tx() {
+        let text = "aaaaa-aa";
+        let principal_id = Principal::from_text(text).unwrap();
+        let hex_raw_tx = vec![
+            248, 81, 10, 134, 9, 24, 78, 114, 160, 0, 130, 117, 48, 148, 112, 153, 121, 112, 197,
+            24, 18, 220, 58, 1, 12, 125, 1, 181, 14, 13, 23, 220, 121, 200, 136, 13, 224, 182, 179,
+            167, 100, 0, 0, 164, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 128, 128,
+        ];
+        let chain_id: u8 = 1;
+
+        block_on(create(principal_id)).unwrap();
+
+        let res = block_on(sign(hex_raw_tx, chain_id, principal_id)).unwrap();
+        println!("{:?}", res)
+
+        // let res = block_on(create(principal_id)).unwrap();
+
+        // assert_eq!(
+        //     "0xec118ecfd5ff8a327c561120021dd3e2fff8e79e".to_string(),
+        //     res.address
+        // )
+    }
 }
