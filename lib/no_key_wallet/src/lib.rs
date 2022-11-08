@@ -52,7 +52,7 @@ struct ECDSAPublicKey {
     pub key_id: EcdsaKeyId,
 }
 
-#[derive(CandidType, Serialize, Debug)]
+#[derive(CandidType, Serialize, Debug, Deserialize)]
 struct SignWithECDSA {
     pub message_hash: Vec<u8>,
     pub derivation_path: Vec<Vec<u8>>,
@@ -69,13 +69,13 @@ struct SignWithECDSAReply {
     pub signature: Vec<u8>,
 }
 
-#[derive(CandidType, Serialize, Debug, Clone)]
+#[derive(CandidType, Serialize, Debug, Clone, Deserialize)]
 struct EcdsaKeyId {
     pub curve: EcdsaCurve,
     pub name: String,
 }
 
-#[derive(CandidType, Serialize, Debug, Clone)]
+#[derive(CandidType, Serialize, Debug, Clone, Deserialize)]
 pub enum EcdsaCurve {
     #[serde(rename = "secp256k1")]
     Secp256k1,
@@ -190,6 +190,7 @@ pub async fn sign(
         derivation_path: vec![caller],
         key_id: key_id.clone(),
     };
+
     let (res,): (SignWithECDSAReply,) = ic_call(
         Principal::management_canister(),
         "sign_with_ecdsa",
@@ -198,12 +199,7 @@ pub async fn sign(
     .await
     .map_err(|e| format!("Failed to call sign_with_ecdsa {}", e.1))?;
 
-    ic_cdk::println!("signature {:?}", res.signature);
     let rec_id = get_rec_id(&message, &res.signature, &user.public_key).unwrap();
-
-    ic_cdk::println!("pub_key {:?}", user.public_key);
-
-    ic_cdk::println!("hex_raw_tx {:?}\n", hex_raw_tx);
 
     let signed_tx = sign_tx(res.signature.clone(), hex_raw_tx, chain_id, rec_id);
 
@@ -399,10 +395,12 @@ mod tests {
     }
 
     pub fn ic_call<T: ArgumentEncoder, R: for<'a> ArgumentDecoder<'a>>(
-        id: Principal,
+        _id: Principal,
         method: &str,
         args: T,
     ) -> impl Future<Output = CallResult<R>> + '_ {
+        let args_raw = candid::encode_args(args).expect("Failed to encode arguments.");
+
         async move {
             if method == "ecdsa_public_key" {
                 let private_key = generate_random_private_key();
@@ -427,8 +425,21 @@ mod tests {
             }
             if method == "sign_with_ecdsa" {
                 let private_key = STATE_TEST.with(|s| s.borrow().private_key);
+                let args = Decode!(&args_raw, SignWithECDSA).unwrap();
 
-                return Err((RejectionCode::CanisterReject, String::from("no method")));
+                let msg: [u8; 32] = args.message_hash[..32].try_into().unwrap();
+
+                let message = libsecp256k1::Message::parse(&msg);
+
+                let signature = libsecp256k1::sign(&message, &private_key);
+
+                let obj = SignWithECDSAReply {
+                    signature: signature.0.serialize().to_vec(),
+                };
+                let bytes = Encode!(&obj).unwrap();
+                let mut de = IDLDeserialize::new(&bytes).unwrap();
+                let res: R = ArgumentDecoder::decode(&mut de).unwrap();
+                return Ok(res);
             } else {
                 return Err((RejectionCode::CanisterReject, String::from("no method")));
             }
@@ -455,7 +466,6 @@ mod tests {
         assert_eq!(42, res.address.len());
     }
     #[test]
-    #[ignore]
     fn sign_tx() {
         let text = "aaaaa-aa";
         let principal_id = Principal::from_text(text).unwrap();
@@ -470,13 +480,6 @@ mod tests {
         block_on(create(principal_id)).unwrap();
 
         let res = block_on(sign(hex_raw_tx, chain_id, principal_id)).unwrap();
-        println!("{:?}", res)
-
-        // let res = block_on(create(principal_id)).unwrap();
-
-        // assert_eq!(
-        //     "0xec118ecfd5ff8a327c561120021dd3e2fff8e79e".to_string(),
-        //     res.address
-        // )
+        println!("{:?}", res.sign_tx);
     }
 }
