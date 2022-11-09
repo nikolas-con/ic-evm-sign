@@ -1,6 +1,6 @@
-use crate::rlp::RlpStream;
 #[cfg(test)]
 use crate::tests::{ic_call, ic_timestamp};
+use futures::io::ReadExact;
 #[cfg(not(test))]
 use ic_cdk::api::time as ic_timestamp;
 #[cfg(not(test))]
@@ -181,7 +181,7 @@ pub async fn sign(
     }
 
     // todo
-    let message = get_message_to_sign(hex_raw_tx.clone(), &chain_id);
+    let message = get_message_to_sign(hex_raw_tx.clone(), &chain_id).unwrap();
 
     assert!(message.len() == 32);
 
@@ -261,7 +261,7 @@ fn get_derivation_path(caller: Principal) -> Vec<u8> {
     caller.as_slice().to_vec()
 }
 
-fn get_message_to_sign(hex_raw_tx: Vec<u8>, chain_id: &u8) -> Vec<u8> {
+fn get_message_to_sign(hex_raw_tx: Vec<u8>, chain_id: &u8) -> Result<Vec<u8>, String> {
     let tx_type = get_transaction_type(&hex_raw_tx).unwrap();
     if tx_type == TransactionType::Legacy {
         let mut decoded_tx = rlp::decode_list::<Vec<u8>>(&hex_raw_tx[..]);
@@ -272,11 +272,17 @@ fn get_message_to_sign(hex_raw_tx: Vec<u8>, chain_id: &u8) -> Vec<u8> {
 
         let keccak256 = easy_hasher::raw_keccak256(encoded_tx);
 
-        keccak256.to_vec()
+        Ok(keccak256.to_vec())
     } else if tx_type == TransactionType::EIP1559 {
-        return vec![];
+        let first_elemnts = &hex_raw_tx[..2];
+        let hex_to_hash = &hex_raw_tx[3..hex_raw_tx.len() - 3];
+        let len_hex = &[u8::try_from(hex_to_hash.len()).unwrap()];
+        let hex = [first_elemnts, len_hex, hex_to_hash].concat();
+
+        let keccak256 = easy_hasher::raw_keccak256(hex);
+        Ok(keccak256.to_vec())
     } else {
-        return vec![];
+        Err(String::from("something went wrong get_message_to_sign"))
     }
 }
 
@@ -316,17 +322,39 @@ fn get_rec_id(
 }
 
 fn sign_tx(signature: Vec<u8>, hex_raw_tx: Vec<u8>, chain_id: u8, rec_id: usize) -> Vec<u8> {
-    let r = &signature[..32];
-    let s = &signature[32..];
-    let v = u8::try_from(chain_id * 2 + 35 + u8::try_from(rec_id).unwrap()).unwrap();
+    let tx_type = get_transaction_type(&hex_raw_tx).unwrap();
+    if tx_type == TransactionType::Legacy {
+        let r = &signature[..32];
+        let s = &signature[32..];
+        let v = u8::try_from(chain_id * 2 + 35 + u8::try_from(rec_id).unwrap()).unwrap();
 
-    let mut decode_tx = rlp::decode_list::<Vec<u8>>(&hex_raw_tx[..]);
+        let mut decode_tx = rlp::decode_list::<Vec<u8>>(&hex_raw_tx[..]);
 
-    decode_tx[6] = vec![v];
-    decode_tx[7] = r.to_vec();
-    decode_tx[8] = s.to_vec();
+        decode_tx[6] = vec![v];
+        decode_tx[7] = r.to_vec();
+        decode_tx[8] = s.to_vec();
 
-    rlp::encode_list::<Vec<u8>, Vec<u8>>(&decode_tx).to_vec()
+        rlp::encode_list::<Vec<u8>, Vec<u8>>(&decode_tx).to_vec()
+    } else if tx_type == TransactionType::EIP1559 {
+        let r = &signature[..32];
+        let s = &signature[32..];
+        let v: Vec<u8>;
+        let removed_last = &hex_raw_tx[3..hex_raw_tx.len() - 3];
+        let hex: Vec<u8>;
+
+        if rec_id == 0 {
+            v = vec![u8::from(128)];
+        } else {
+            v = vec![u8::from(129)];
+        }
+        hex = [removed_last, &v, &[u8::from(160)], r, &[u8::from(160)], s].concat();
+
+        let msg_length = u8::try_from(hex.len()).unwrap();
+
+        [&hex_raw_tx[..2], &[msg_length], &hex].concat()
+    } else {
+        vec![]
+    }
 }
 
 fn compute_address(public_key: Vec<u8>) -> String {
@@ -482,7 +510,7 @@ mod tests {
         let recovery_id_byte =
             libsecp256k1::RecoveryId::parse(u8::try_from(recovery_id).unwrap()).unwrap();
 
-        let msg = get_message_to_sign(raw_tx.clone(), &chain_id);
+        let msg = get_message_to_sign(raw_tx.clone(), &chain_id).unwrap();
 
         let message_bytes: [u8; 32] = msg[..].try_into().unwrap();
         let message_bytes_32 = libsecp256k1::Message::parse(&message_bytes);
