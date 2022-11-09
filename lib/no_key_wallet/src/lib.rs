@@ -80,6 +80,12 @@ pub enum EcdsaCurve {
     #[serde(rename = "secp256k1")]
     Secp256k1,
 }
+#[derive(Debug, Clone, PartialEq)]
+pub enum TransactionType {
+    Legacy,
+    EIP1559,
+    EPI2930,
+}
 #[derive(CandidType, Serialize, Debug, Clone, Deserialize)]
 pub struct Transaction {
     pub data: Vec<u8>,
@@ -174,6 +180,7 @@ pub async fn sign(
         return Err("this user does not exist".to_string());
     }
 
+    // todo
     let message = get_message_to_sign(hex_raw_tx.clone(), &chain_id);
 
     assert!(message.len() == 32);
@@ -201,6 +208,7 @@ pub async fn sign(
 
     let rec_id = get_rec_id(&message, &res.signature, &user.public_key).unwrap();
 
+    // todo
     let signed_tx = sign_tx(res.signature.clone(), hex_raw_tx, chain_id, rec_id);
 
     STATE.with(|s| {
@@ -254,22 +262,34 @@ fn get_derivation_path(caller: Principal) -> Vec<u8> {
 }
 
 fn get_message_to_sign(hex_raw_tx: Vec<u8>, chain_id: &u8) -> Vec<u8> {
-    let mut raw_tx = hex_raw_tx.clone();
+    let tx_type = get_transaction_type(&hex_raw_tx).unwrap();
+    if tx_type == TransactionType::Legacy {
+        let mut decoded_tx = rlp::decode_list::<Vec<u8>>(&hex_raw_tx[..]);
 
-    raw_tx.insert(0, 0x83);
+        decoded_tx[6] = vec![chain_id.clone()];
 
-    let mut decoded_tx = decode_tx(raw_tx.clone());
+        let encoded_tx = rlp::encode_list::<Vec<u8>, Vec<u8>>(&decoded_tx).to_vec();
 
-    decoded_tx[0] = match decoded_tx[0][decoded_tx[0].len() - 1] == 128 {
-        true => vec![],
-        false => vec![decoded_tx[0][decoded_tx[0].len() - 1]],
-    };
+        let keccak256 = easy_hasher::raw_keccak256(encoded_tx);
 
-    decoded_tx[6] = vec![u8::from(chain_id.clone())];
+        keccak256.to_vec()
+    } else if tx_type == TransactionType::EIP1559 {
+        return vec![];
+    } else {
+        return vec![];
+    }
+}
 
-    let encoded_tx = encode_tx(decoded_tx);
-
-    hash_tx(&encoded_tx)
+fn get_transaction_type(hex_raw_tx: &Vec<u8>) -> Result<TransactionType, String> {
+    if hex_raw_tx[0] == 0xf8 {
+        return Ok(TransactionType::Legacy);
+    } else if hex_raw_tx[0] == 0x01 {
+        return Ok(TransactionType::EPI2930);
+    } else if hex_raw_tx[0] == 0x02 {
+        return Ok(TransactionType::EIP1559);
+    } else {
+        return Err(String::from("Invalid type"));
+    }
 }
 
 fn get_rec_id(
@@ -295,54 +315,18 @@ fn get_rec_id(
     return Err("Not found".to_string());
 }
 
-fn decode_tx(hex_raw_tx: Vec<u8>) -> Vec<Vec<u8>> {
-    let mut index = 0;
-    let data_len = hex_raw_tx.len();
-    let mut decode_tx: Vec<Vec<u8>> = vec![];
-
-    while index < data_len {
-        let decode_data: Vec<u8> = rlp::decode(&hex_raw_tx[index..]);
-        if decode_data.len() == 1 {
-            index = index + decode_data.len();
-        } else {
-            index = index + decode_data.len() + 1;
-        }
-        decode_tx.push(decode_data);
-    }
-
-    decode_tx
-}
-
-fn encode_tx(decoded_txt: Vec<Vec<u8>>) -> Vec<u8> {
-    let mut stream = RlpStream::new_list(decoded_txt.len());
-
-    for chucks in decoded_txt {
-        stream.append(&chucks);
-    }
-
-    let out = stream.out();
-
-    out
-}
-
-fn hash_tx(hex_raw_tx: &Vec<u8>) -> Vec<u8> {
-    let keccak256 = easy_hasher::raw_keccak256(hex_raw_tx[..].to_vec());
-
-    keccak256.to_vec()
-}
-
 fn sign_tx(signature: Vec<u8>, hex_raw_tx: Vec<u8>, chain_id: u8, rec_id: usize) -> Vec<u8> {
     let r = &signature[..32];
     let s = &signature[32..];
-    let v = &[u8::try_from(chain_id * 2 + 35 + u8::try_from(rec_id).unwrap()).unwrap()];
+    let v = u8::try_from(chain_id * 2 + 35 + u8::try_from(rec_id).unwrap()).unwrap();
 
-    let removed_last = &hex_raw_tx[0..hex_raw_tx.len() - 3];
+    let mut decode_tx = rlp::decode_list::<Vec<u8>>(&hex_raw_tx[..]);
 
-    let hex = [removed_last, v, &[u8::from(160)], r, &[u8::from(160)], s].concat();
+    decode_tx[6] = vec![v];
+    decode_tx[7] = r.to_vec();
+    decode_tx[8] = s.to_vec();
 
-    let msg_length = u8::try_from(hex[2..].len()).unwrap();
-
-    [&hex[..1], &[msg_length], &hex[2..]].concat()
+    rlp::encode_list::<Vec<u8>, Vec<u8>>(&decode_tx).to_vec()
 }
 
 fn compute_address(public_key: Vec<u8>) -> String {
@@ -382,7 +366,6 @@ mod tests {
     use candid::{Decode, Encode};
     use ic_cdk::api::call::{CallResult, RejectionCode};
     use libsecp256k1::{PublicKey, SecretKey};
-    use rand::{thread_rng, RngCore};
     use std::future::Future;
 
     pub struct State {
@@ -451,11 +434,9 @@ mod tests {
     }
 
     fn generate_random_private_key() -> SecretKey {
-        let mut rng = thread_rng();
-
         loop {
             let mut ret = [0u8; 32];
-            rng.fill_bytes(&mut ret);
+            getrandom::getrandom(&mut ret).unwrap();
             if let Ok(key) = SecretKey::parse(&ret) {
                 return key;
             }
@@ -482,14 +463,10 @@ mod tests {
         let chain_id: u8 = 1;
 
         let res0 = block_on(create(principal_id)).unwrap();
-        println!("{:?}", res0.address);
 
         let res = block_on(sign(raw_tx.clone(), chain_id, principal_id)).unwrap();
 
-        let mut hex_raw_tx: Vec<u8> = res.sign_tx.clone();
-        hex_raw_tx.insert(0, 0x83);
-
-        let decoded_tx = decode_tx(hex_raw_tx);
+        let decoded_tx = rlp::decode_list::<Vec<u8>>(&res.sign_tx[..]);
 
         let v = decoded_tx[6].clone();
         let r = decoded_tx[7].clone();
