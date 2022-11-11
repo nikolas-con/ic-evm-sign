@@ -264,11 +264,19 @@ fn get_derivation_path(caller: Principal) -> Vec<u8> {
 fn get_message_to_sign(hex_raw_tx: Vec<u8>, chain_id: &u8) -> Result<Vec<u8>, String> {
     let tx_type = get_transaction_type(&hex_raw_tx).unwrap();
     if tx_type == TransactionType::Legacy {
-        let mut decoded_tx = rlp::decode_list::<Vec<u8>>(&hex_raw_tx[..]);
+        let rlp = rlp::Rlp::new(&hex_raw_tx[..]);
 
-        decoded_tx[6] = vec![chain_id.clone()];
-
-        let encoded_tx = rlp::encode_list::<Vec<u8>, Vec<u8>>(&decoded_tx).to_vec();
+        let mut stream = rlp::RlpStream::new_list(9);
+        for i in 0..=8 {
+            let bytes: Vec<u8>;
+            if i == 6 {
+                bytes = vec![chain_id.clone()];
+            } else {
+                bytes = rlp.at(i).as_val::<Vec<u8>>();
+            }
+            stream.append(&bytes);
+        }
+        let encoded_tx = stream.out();
 
         let keccak256 = easy_hasher::raw_keccak256(encoded_tx);
 
@@ -328,13 +336,24 @@ fn sign_tx(signature: Vec<u8>, hex_raw_tx: Vec<u8>, chain_id: u8, rec_id: usize)
         let s = &signature[32..];
         let v = u8::try_from(chain_id * 2 + 35 + u8::try_from(rec_id).unwrap()).unwrap();
 
-        let mut decode_tx = rlp::decode_list::<Vec<u8>>(&hex_raw_tx[..]);
+        let rlp = rlp::Rlp::new(&hex_raw_tx[..]);
 
-        decode_tx[6] = vec![v];
-        decode_tx[7] = r.to_vec();
-        decode_tx[8] = s.to_vec();
+        let mut stream = rlp::RlpStream::new_list(9);
+        for i in 0..=8 {
+            let bytes: Vec<u8>;
+            if i == 6 {
+                bytes = vec![v];
+            } else if i == 7 {
+                bytes = r.to_vec();
+            } else if i == 8 {
+                bytes = s.to_vec();
+            } else {
+                bytes = rlp.at(i).as_val::<Vec<u8>>();
+            }
+            stream.append(&bytes);
+        }
 
-        rlp::encode_list::<Vec<u8>, Vec<u8>>(&decode_tx).to_vec()
+        stream.out()
     } else if tx_type == TransactionType::EIP1559 {
         let r = &signature[..32];
         let s = &signature[32..];
@@ -494,11 +513,11 @@ mod tests {
 
         let res = block_on(sign(raw_tx.clone(), chain_id, principal_id)).unwrap();
 
-        let decoded_tx = rlp::decode_list::<Vec<u8>>(&res.sign_tx[..]);
+        let rlp = rlp::Rlp::new(&res.sign_tx[..]);
 
-        let v = decoded_tx[6].clone();
-        let r = decoded_tx[7].clone();
-        let s = decoded_tx[8].clone();
+        let v = rlp.at(6).as_val::<Vec<u8>>();
+        let r = rlp.at(7).as_val::<Vec<u8>>();
+        let s = rlp.at(8).as_val::<Vec<u8>>();
 
         let signature = [r, s].concat();
 
