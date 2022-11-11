@@ -144,7 +144,15 @@ describe("sign traduction", function () {
       to: await user2.getAddress(),
       value: ethers.utils.parseEther(value).toHexString(),
       chainId: "0x01",
-      accessList: [],
+      accessList: [
+        {
+          address: "0x0000000000000000000000000000000000000101",
+          storageKeys: [
+            "0x0000000000000000000000000000000000000000000000000000000000000000",
+            "0x00000000000000000000000000000000000000000000000000000000000060a7",
+          ],
+        },
+      ],
       type: "0x02",
     };
 

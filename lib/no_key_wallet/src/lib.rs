@@ -282,12 +282,26 @@ fn get_message_to_sign(hex_raw_tx: Vec<u8>, chain_id: &u8) -> Result<Vec<u8>, St
 
         Ok(keccak256.to_vec())
     } else if tx_type == TransactionType::EIP1559 {
-        let first_elemnts = &hex_raw_tx[..2];
-        let hex_to_hash = &hex_raw_tx[3..hex_raw_tx.len() - 3];
-        let len_hex = &[u8::try_from(hex_to_hash.len()).unwrap()];
-        let hex = [first_elemnts, len_hex, hex_to_hash].concat();
+        let rlp = rlp::Rlp::new(&hex_raw_tx[1..]);
 
-        let keccak256 = easy_hasher::raw_keccak256(hex);
+        let mut stream = rlp::RlpStream::new_list(9);
+        for i in 0..=8 {
+            if i == 8 {
+                let item = rlp.at(i);
+                let raw = item.as_raw();
+                let item_count: usize = 1;
+                stream.append_raw(raw, item_count);
+            } else {
+                let item = rlp.at(i).as_val::<Vec<u8>>();
+                stream.append(&item);
+            }
+        }
+
+        let decode_tx = stream.out();
+
+        ic_cdk::println!("hey");
+        let msg = [&hex_raw_tx[..1], &decode_tx[..]].concat();
+        let keccak256 = easy_hasher::raw_keccak256(msg);
         Ok(keccak256.to_vec())
     } else {
         Err(String::from("something went wrong get_message_to_sign"))
@@ -357,20 +371,32 @@ fn sign_tx(signature: Vec<u8>, hex_raw_tx: Vec<u8>, chain_id: u8, rec_id: usize)
     } else if tx_type == TransactionType::EIP1559 {
         let r = &signature[..32];
         let s = &signature[32..];
-        let v: Vec<u8>;
-        let removed_last = &hex_raw_tx[3..hex_raw_tx.len() - 3];
-        let hex: Vec<u8>;
+        let rlp = rlp::Rlp::new(&hex_raw_tx[1..]);
+        let mut stream = rlp::RlpStream::new_list(12);
 
-        if rec_id == 0 {
-            v = vec![u8::from(128)];
-        } else {
-            v = vec![u8::from(129)];
+        for i in 0..12 {
+            if i == 8 {
+                let val = rlp.at(i).as_raw();
+
+                stream.append_raw(&val, 1);
+            } else if i == 9 {
+                if rec_id == 0 {
+                    stream.append_empty_data();
+                } else {
+                    let v = vec![0x01];
+                    stream.append(&v);
+                }
+            } else if i == 10 {
+                stream.append(&r);
+            } else if i == 11 {
+                stream.append(&s);
+            } else {
+                let bytes = rlp.at(i).as_val::<Vec<u8>>();
+
+                stream.append(&bytes);
+            }
         }
-        hex = [removed_last, &v, &[u8::from(160)], r, &[u8::from(160)], s].concat();
-
-        let msg_length = u8::try_from(hex.len()).unwrap();
-
-        [&hex_raw_tx[..2], &[msg_length], &hex].concat()
+        [&hex_raw_tx[..1], &stream.out()].concat()
     } else {
         vec![]
     }
@@ -415,6 +441,15 @@ mod tests {
     use libsecp256k1::{PublicKey, SecretKey};
     use std::future::Future;
 
+    #[derive(Debug, Clone)]
+    pub struct ENMLegacyTransaction {
+        nonce: Vec<u8>,
+        gas_price: Vec<u8>,
+        gas_limit: Vec<u8>,
+        to: Vec<u8>,
+        value: Vec<u8>,
+        data: Vec<u8>,
+    }
     pub struct State {
         private_key: SecretKey,
     }
@@ -489,7 +524,35 @@ mod tests {
             }
         }
     }
+    fn string_to_vev_u8(str: &str) -> Vec<u8> {
+        (0..str.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&str[i..i + 2], 16).unwrap())
+            .collect::<Vec<u8>>()
+    }
+
+    // const txParams = {
+    //     nonce: 0,
+    //     gasPrice: "0x09184e72a000",
+    //     gasLimit: "0x7530",
+    //     to: await user2.getAddress(),
+    //     value: ethers.utils.parseEther(value).toHexString(),
+    //     data: "0x7f7465737432000000000000000000000000000000000000000000000000000000600057",
+    //   };
+    use std::str;
     #[test]
+    #[ignore]
+    fn create_tx() {
+        let nonce = String::from("0");
+        let gas_price = "10000000000000";
+        let gas_limit = "30000".to_string();
+        let to = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266".to_string();
+        let value = "100000000000000000".to_string();
+        let data = "0x7f7465737432000000000000000000000000000000000000000000000000000000600057"
+            .to_string();
+    }
+    #[test]
+    #[ignore]
     fn create_new_user() {
         let text = "aaaaa-aa";
         let principal_id = Principal::from_text(text).unwrap();
@@ -498,6 +561,7 @@ mod tests {
         assert_eq!(42, res.address.len());
     }
     #[test]
+
     fn sign_tx() {
         let text = "aaaaa-aa";
         let principal_id = Principal::from_text(text).unwrap();
