@@ -1,3 +1,5 @@
+#[cfg(test)]
+use crate::tests::EVMLegacyTransaction;
 use easy_hasher::easy_hasher;
 use ic_cdk::export::Principal;
 
@@ -57,4 +59,42 @@ pub fn generate_random_private_key() -> libsecp256k1::SecretKey {
             return key;
         }
     }
+}
+#[cfg(test)]
+pub fn create_raw_tx_legacy(arg: EVMLegacyTransaction) -> Vec<u8> {
+    let mut stream = rlp::RlpStream::new_list(9);
+
+    if arg.nonce == 0 {
+        stream.append_empty_data();
+    } else {
+        let nonce = format!("{:02x}", arg.nonce);
+        let nonce_to_vev_u8 = string_to_vev_u8(&nonce);
+        stream.append(&nonce_to_vev_u8);
+    }
+
+    let gas_price = format!("{:010x}", arg.gas_price);
+    let gas_price_to_vev_u8 = string_to_vev_u8(&gas_price);
+    stream.append(&gas_price_to_vev_u8);
+
+    let gas_limit = format!("{:02x}", arg.gas_limit);
+    let gas_limit_to_vev_u8 = string_to_vev_u8(&gas_limit);
+    stream.append(&gas_limit_to_vev_u8);
+
+    let to = arg.to;
+    let to_to_vev_u8 = string_to_vev_u8(&to[2..]);
+    stream.append(&to_to_vev_u8);
+
+    let value = format!("{:020x}", arg.value);
+    let value_to_vev_u8 = string_to_vev_u8(&value);
+    stream.append(&value_to_vev_u8);
+
+    let data = arg.data;
+    let data_to_vev_u8 = string_to_vev_u8(&data[2..]);
+    stream.append(&data_to_vev_u8);
+
+    stream.append_empty_data();
+    stream.append_empty_data();
+    stream.append_empty_data();
+
+    stream.out().to_vec()
 }
