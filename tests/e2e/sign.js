@@ -42,7 +42,7 @@ describe("sign traduction", function () {
           []
         ),
         sign_evm_tx: IDL.Func(
-          [IDL.Vec(IDL.Nat8), IDL.Nat8],
+          [IDL.Vec(IDL.Nat8), IDL.Nat64],
           [IDL.Variant({ Ok: sign_tx_response, Err: IDL.Text })],
           []
         ),
@@ -72,7 +72,7 @@ describe("sign traduction", function () {
     actor = Actor.createActor(idlFactory, createActorOptions);
   });
 
-  it.only("sign traduction e2e legacy", async function () {
+  it("sign traduction e2e legacy", async function () {
     const [owner, user2] = await ethers.getSigners();
     const value = "1";
     let address;
@@ -90,7 +90,7 @@ describe("sign traduction", function () {
     });
 
     const txParams = {
-      nonce: 0,
+      nonce: await ethers.provider.getTransactionCount(address),
       gasPrice: "0x09184e72a000",
       gasLimit: "0x7530",
       to: await user2.getAddress(),
@@ -99,7 +99,7 @@ describe("sign traduction", function () {
     };
 
     const tx = createRawTxLegacy(txParams);
-    console.log(...tx.serialize());
+
     const signedTx = await signTx(tx, actor);
 
     const user2Before = await user2.getBalance();
@@ -142,7 +142,7 @@ describe("sign traduction", function () {
       maxFeePerGas: await ethers.provider
         .getGasPrice()
         .then((s) => s.toHexString()),
-      nonce: "0x00",
+      nonce: await ethers.provider.getTransactionCount(address),
       to: await user2.getAddress(),
       value: ethers.utils.parseEther(value).toHexString(),
       chainId: "0x01",
@@ -202,7 +202,7 @@ describe("sign traduction", function () {
       gasPrice: await ethers.provider
         .getGasPrice()
         .then((s) => s.toHexString()),
-      nonce: "0x00",
+      nonce: await ethers.provider.getTransactionCount(address),
       to: await user2.getAddress(),
       value: ethers.utils.parseEther(value).toHexString(),
       chainId: "0x01",
@@ -274,7 +274,7 @@ const signTx = async (rawTX, actor) => {
   const serializedTx = rawTX.serialize();
   const { chainId } = await ethers.provider.getNetwork();
 
-  const res = await actor.sign_evm_tx([...serializedTx], Number(chainId));
+  const res = await actor.sign_evm_tx([...serializedTx], chainId);
 
   return "0x" + Buffer.from(res.Ok.sign_tx, "hex").toString("hex");
 };
