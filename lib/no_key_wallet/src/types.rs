@@ -77,13 +77,6 @@ pub mod request {
 
 pub mod state {
     use super::*;
-
-    #[derive(Debug, Clone, PartialEq)]
-    pub enum TransactionType {
-        Legacy,
-        EIP1559,
-        EPI2930,
-    }
     #[derive(CandidType, Serialize, Debug, Clone, Deserialize)]
     pub struct Transaction {
         pub data: Vec<u8>,

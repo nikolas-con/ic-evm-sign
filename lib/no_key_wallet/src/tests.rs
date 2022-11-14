@@ -35,15 +35,17 @@ fn sign_legacy_tx() {
     };
     let raw_tx = create_raw_tx_legacy(tx_parm);
 
-    let chain_id: u8 = 1;
+    let chain_id: usize = 1;
 
     let res0 = block_on(create(principal_id)).unwrap();
 
     let res = block_on(sign(raw_tx.clone(), chain_id, principal_id)).unwrap();
 
+    let tx = transaction::get_transaction(&res.sign_tx, chain_id).unwrap();
+
     let signature = get_signature(&res.sign_tx);
 
-    let msg = get_message_to_sign(raw_tx.clone(), &chain_id).unwrap();
+    let msg = tx.get_message_to_sign().unwrap();
 
     let recovery_id = get_recovery_id(&res.sign_tx, chain_id);
     let address = recover_address(signature, recovery_id, msg);
@@ -62,7 +64,7 @@ fn get_signature(raw_tx: &Vec<u8>) -> Vec<u8> {
     signature
 }
 
-fn get_recovery_id(raw_tx: &Vec<u8>, chain_id: u8) -> u8 {
+fn get_recovery_id(raw_tx: &Vec<u8>, chain_id: usize) -> u8 {
     let rlp = rlp::Rlp::new(&raw_tx[..]);
     let v = rlp.at(6).as_val::<Vec<u8>>();
     let recovery_id =
