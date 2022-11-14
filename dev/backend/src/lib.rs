@@ -1,6 +1,7 @@
 use ic_cdk::export::candid::CandidType;
 use ic_cdk_macros::*;
 use no_key_wallet;
+use no_key_wallet::types::state::Transaction;
 
 #[derive(Debug, CandidType)]
 struct CreateResponse {
@@ -10,15 +11,14 @@ struct CreateResponse {
 struct SignatureInfo {
     sign_tx: Vec<u8>,
 }
-
 #[derive(Debug, CandidType)]
 struct CallerTransactionsResponse {
-    transactions: Vec<no_key_wallet::Transaction>,
+    transactions: Vec<Transaction>,
 }
 #[derive(Debug, CandidType)]
 struct CallerResponse {
     address: String,
-    transactions: Vec<no_key_wallet::Transaction>,
+    transactions: Vec<Transaction>,
 }
 
 #[update]
