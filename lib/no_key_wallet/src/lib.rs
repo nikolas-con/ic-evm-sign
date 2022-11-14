@@ -209,7 +209,7 @@ pub async fn sign(
     let rec_id = get_rec_id(&message, &res.signature, &user.public_key).unwrap();
 
     // todo
-    let signed_tx = sign_tx(res.signature.clone(), hex_raw_tx, chain_id, rec_id);
+    let signed_tx = sign_tx(res.signature.clone(), hex_raw_tx, chain_id, rec_id).unwrap();
 
     STATE.with(|s| {
         let mut state = s.borrow_mut();
@@ -299,7 +299,27 @@ fn get_message_to_sign(hex_raw_tx: Vec<u8>, chain_id: &u8) -> Result<Vec<u8>, St
 
         let decode_tx = stream.out();
 
-        ic_cdk::println!("hey");
+        let msg = [&hex_raw_tx[..1], &decode_tx[..]].concat();
+        let keccak256 = easy_hasher::raw_keccak256(msg);
+        Ok(keccak256.to_vec())
+    } else if tx_type == TransactionType::EPI2930 {
+        let rlp = rlp::Rlp::new(&hex_raw_tx[1..]);
+
+        let mut stream = rlp::RlpStream::new_list(8);
+
+        for i in 0..=7 {
+            if i == 7 {
+                let item = rlp.at(i);
+                let raw = item.as_raw();
+                let item_count: usize = 1;
+                stream.append_raw(raw, item_count);
+            } else {
+                let item = rlp.at(i).as_val::<Vec<u8>>();
+                stream.append(&item);
+            }
+        }
+        let decode_tx = stream.out();
+
         let msg = [&hex_raw_tx[..1], &decode_tx[..]].concat();
         let keccak256 = easy_hasher::raw_keccak256(msg);
         Ok(keccak256.to_vec())
@@ -343,7 +363,12 @@ fn get_rec_id(
     return Err("Not found".to_string());
 }
 
-fn sign_tx(signature: Vec<u8>, hex_raw_tx: Vec<u8>, chain_id: u8, rec_id: usize) -> Vec<u8> {
+fn sign_tx(
+    signature: Vec<u8>,
+    hex_raw_tx: Vec<u8>,
+    chain_id: u8,
+    rec_id: usize,
+) -> Result<Vec<u8>, String> {
     let tx_type = get_transaction_type(&hex_raw_tx).unwrap();
     if tx_type == TransactionType::Legacy {
         let r = &signature[..32];
@@ -367,7 +392,7 @@ fn sign_tx(signature: Vec<u8>, hex_raw_tx: Vec<u8>, chain_id: u8, rec_id: usize)
             stream.append(&bytes);
         }
 
-        stream.out()
+        Ok(stream.out())
     } else if tx_type == TransactionType::EIP1559 {
         let r = &signature[..32];
         let s = &signature[32..];
@@ -396,9 +421,38 @@ fn sign_tx(signature: Vec<u8>, hex_raw_tx: Vec<u8>, chain_id: u8, rec_id: usize)
                 stream.append(&bytes);
             }
         }
-        [&hex_raw_tx[..1], &stream.out()].concat()
+        Ok([&hex_raw_tx[..1], &stream.out()].concat())
+    } else if tx_type == TransactionType::EPI2930 {
+        let r = &signature[..32];
+        let s = &signature[32..];
+        let rlp = rlp::Rlp::new(&hex_raw_tx[1..]);
+        let mut stream = rlp::RlpStream::new_list(11);
+
+        for i in 0..11 {
+            if i == 7 {
+                let val = rlp.at(i).as_raw();
+
+                stream.append_raw(&val, 1);
+            } else if i == 8 {
+                if rec_id == 0 {
+                    stream.append_empty_data();
+                } else {
+                    let v = vec![0x01];
+                    stream.append(&v);
+                }
+            } else if i == 9 {
+                stream.append(&r);
+            } else if i == 10 {
+                stream.append(&s);
+            } else {
+                let bytes = rlp.at(i).as_val::<Vec<u8>>();
+
+                stream.append(&bytes);
+            }
+        }
+        Ok([&hex_raw_tx[..1], &stream.out()].concat())
     } else {
-        vec![]
+        Err("Not valid TransactionType".to_string())
     }
 }
 
@@ -442,14 +496,15 @@ mod tests {
     use std::future::Future;
 
     #[derive(Debug, Clone)]
-    pub struct ENMLegacyTransaction {
-        nonce: Vec<u8>,
-        gas_price: Vec<u8>,
-        gas_limit: Vec<u8>,
-        to: Vec<u8>,
-        value: Vec<u8>,
-        data: Vec<u8>,
+    pub struct EVMLegacyTransaction {
+        nonce: usize,
+        gas_price: usize,
+        gas_limit: usize,
+        to: String,
+        value: usize,
+        data: String,
     }
+
     pub struct State {
         private_key: SecretKey,
     }
@@ -531,28 +586,23 @@ mod tests {
             .collect::<Vec<u8>>()
     }
 
-    // const txParams = {
-    //     nonce: 0,
-    //     gasPrice: "0x09184e72a000",
-    //     gasLimit: "0x7530",
-    //     to: await user2.getAddress(),
-    //     value: ethers.utils.parseEther(value).toHexString(),
-    //     data: "0x7f7465737432000000000000000000000000000000000000000000000000000000600057",
-    //   };
-    use std::str;
-    #[test]
-    #[ignore]
-    fn create_tx() {
-        let nonce = String::from("0");
-        let gas_price = "10000000000000";
-        let gas_limit = "30000".to_string();
-        let to = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266".to_string();
-        let value = "100000000000000000".to_string();
-        let data = "0x7f7465737432000000000000000000000000000000000000000000000000000000600057"
-            .to_string();
+    fn create_tx(args: EVMLegacyTransaction) -> Vec<u8> {
+        let mut stream = rlp::RlpStream::new_list(3);
+
+        stream.append_empty_data();
+
+        let gas_price = string_to_vev_u8(&format!("{:x}", args.gas_price));
+        stream.append(&gas_price);
+
+        let gas_limit = string_to_vev_u8(&format!("{:x}", args.gas_limit));
+        stream.append(&gas_limit);
+
+        let to = string_to_vev_u8(&args.to);
+        stream.append(&to);
+        println!("{:?}", stream.out().to_vec());
+        vec![]
     }
     #[test]
-    #[ignore]
     fn create_new_user() {
         let text = "aaaaa-aa";
         let principal_id = Principal::from_text(text).unwrap();
@@ -561,7 +611,6 @@ mod tests {
         assert_eq!(42, res.address.len());
     }
     #[test]
-
     fn sign_tx() {
         let text = "aaaaa-aa";
         let principal_id = Principal::from_text(text).unwrap();
@@ -571,6 +620,15 @@ mod tests {
             167, 100, 0, 0, 164, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 128, 128,
         ];
+        let tx = EVMLegacyTransaction {
+            nonce: 0,
+            gas_price: 36935555629,
+            gas_limit: 31272,
+            to: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8".to_string(),
+            value: 1000000000000000000,
+            data: "0x000000000000000000000000000000000000000000000000000000000000000000000000"
+                .to_string(),
+        };
         let chain_id: u8 = 1;
 
         let res0 = block_on(create(principal_id)).unwrap();

@@ -2,7 +2,11 @@ const { Actor, HttpAgent } = require("@dfinity/agent");
 const { Principal } = require("@dfinity/principal");
 
 const { Chain, Common, Hardfork } = require("@ethereumjs/common");
-const { Transaction, FeeMarketEIP1559Transaction } = require("@ethereumjs/tx");
+const {
+  Transaction,
+  FeeMarketEIP1559Transaction,
+  AccessListEIP2930Transaction,
+} = require("@ethereumjs/tx");
 
 const { assert } = require("chai");
 const { ethers } = require("hardhat");
@@ -68,7 +72,7 @@ describe("sign traduction", function () {
     actor = Actor.createActor(idlFactory, createActorOptions);
   });
 
-  it("sign traduction e2e legacy", async function () {
+  it.only("sign traduction e2e legacy", async function () {
     const [owner, user2] = await ethers.getSigners();
     const value = "1";
     let address;
@@ -95,7 +99,7 @@ describe("sign traduction", function () {
     };
 
     const tx = createRawTxLegacy(txParams);
-
+    console.log(...tx.serialize());
     const signedTx = await signTx(tx, actor);
 
     const user2Before = await user2.getBalance();
@@ -113,7 +117,7 @@ describe("sign traduction", function () {
 
     assert.ok(user2After.sub(user2Before).eq(ethers.utils.parseEther(value)));
   });
-  it.only("sign traduction e2e 1559", async function () {
+  it("sign traduction e2e 1559", async function () {
     const [owner, user2] = await ethers.getSigners();
     const value = "0.5";
     let address;
@@ -130,8 +134,6 @@ describe("sign traduction", function () {
       to: address,
       value: ethers.utils.parseEther("200"),
     });
-    // 1396406304565822362002;
-    // 200000000000000000000;
 
     const txData = {
       data: "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
@@ -175,6 +177,66 @@ describe("sign traduction", function () {
 
     assert.ok(user2After.sub(user2Before).eq(ethers.utils.parseEther(value)));
   });
+  it("sign traduction e2e 2930", async function () {
+    const [owner, user2] = await ethers.getSigners();
+    const value = "1";
+    let address;
+    try {
+      const res = await actor.create();
+      address = res.Ok.address;
+    } catch (error) {
+      const res = await actor.get_caller_data();
+      address = res.Ok.address;
+    }
+    console.log(address);
+
+    await owner.sendTransaction({
+      to: address,
+      value: ethers.utils.parseEther("200"),
+    });
+    console.log(ethers.utils.parseEther(value));
+    const txData = {
+      data: "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      gasLimit: "0x7A28",
+      maxPriorityFeePerGas: "0x59682f00",
+      gasPrice: await ethers.provider
+        .getGasPrice()
+        .then((s) => s.toHexString()),
+      nonce: "0x00",
+      to: await user2.getAddress(),
+      value: ethers.utils.parseEther(value).toHexString(),
+      chainId: "0x01",
+      accessList: [
+        {
+          address: "0x0000000000000000000000000000000000000101",
+          storageKeys: [
+            "0x0000000000000000000000000000000000000000000000000000000000000000",
+            "0x00000000000000000000000000000000000000000000000000000000000060a7",
+          ],
+        },
+      ],
+      type: "0x01",
+    };
+
+    const tx = createRawTx2930(txData);
+
+    const signedTx = await signTx(tx, actor);
+
+    const user2Before = await user2.getBalance();
+
+    const { hash } = await ethers.provider.sendTransaction(signedTx);
+
+    await ethers.provider.waitForTransaction(hash);
+
+    const icAfter = await ethers.provider.getBalance(address);
+
+    const user2After = await user2.getBalance();
+
+    console.log("user2After", ethers.utils.formatEther(user2After));
+    console.log("user2Before", ethers.utils.formatEther(user2Before));
+
+    assert.ok(user2After.sub(user2Before).eq(ethers.utils.parseEther(value)));
+  });
 });
 
 const createRawTxLegacy = (txParams) => {
@@ -194,6 +256,16 @@ const createRawTx1559 = (txParams) => {
   });
 
   const tx = FeeMarketEIP1559Transaction.fromTxData(txParams, { common });
+
+  return tx;
+};
+const createRawTx2930 = (txParams) => {
+  const common = new Common({
+    chain: Chain.Mainnet,
+    hardfork: Hardfork.Berlin,
+  });
+
+  const tx = AccessListEIP2930Transaction.fromTxData(txParams, { common });
 
   return tx;
 };
