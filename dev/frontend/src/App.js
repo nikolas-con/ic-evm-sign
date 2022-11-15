@@ -14,7 +14,8 @@ const nanoseconds = BigInt(3600000000000);
 
 const BACKEND_CANISTER_ID = "rrkah-fqaaa-aaaaa-aaaaq-cai";
 const IDENTITY_CANISTER_ID = "ryjl3-tyaaa-aaaaa-aaaba-cai";
-
+const TO_ADDRESS = "0x7b2a3598d63256D0CE33a64ed88515dD6e76Eb2A";
+const FAUCET_ON_LOCAL_NODE = "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC";
 const RPC_URL = process.env.REACT_APP_RPC_URL
   ? process.env.REACT_APP_RPC_URL
   : "http://127.0.0.1:8545/";
@@ -42,7 +43,7 @@ const idleServiceOptions = (IDL) => {
       ["update"]
     ),
     sign_evm_tx: IDL.Func(
-      [IDL.Vec(IDL.Nat8), IDL.Nat8],
+      [IDL.Vec(IDL.Nat8), IDL.Nat64],
       [IDL.Variant({ Ok: sign_tx_response, Err: IDL.Text })],
       ["update"]
     ),
@@ -142,7 +143,7 @@ const App = () => {
       nonce: await provider.getTransactionCount(address),
       gasPrice: await provider.getGasPrice().then((s) => s.toHexString()),
       gasLimit: "0x5dc0",
-      to: "0x7b2a3598d63256D0CE33a64ed88515dD6e76Eb2A",
+      to: e.target.address.value,
       value: ethers.utils.parseEther(e.target.amount.value).toHexString(),
       data: "0x000000000000000000000000000000000000000000000000000000000000000000000000",
     };
@@ -176,9 +177,7 @@ const App = () => {
   };
 
   const handleTopUp = async () => {
-    const signer = await provider.getSigner(
-      "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC"
-    );
+    const signer = await provider.getSigner(FAUCET_ON_LOCAL_NODE);
 
     await signer.sendTransaction({
       value: ethers.utils.parseEther("10"),
@@ -237,8 +236,10 @@ const App = () => {
                 )}
 
                 <ul>
-                  {transactions.map((tx) => (
-                    <li>{ethers.utils.parseTransaction(tx.data).hash}</li>
+                  {transactions.map((tx, index) => (
+                    <li key={index}>
+                      {ethers.utils.parseTransaction(tx.data).hash}
+                    </li>
                   ))}
                 </ul>
               </div>
