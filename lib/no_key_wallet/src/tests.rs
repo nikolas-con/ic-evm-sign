@@ -1,39 +1,11 @@
 use super::*;
+use crate::transaction::{EVMTransactionEIP1559, EVMTransactionEIP2930, EVMTransactionLegacy};
 use crate::utils::{
     create_raw_eip_2930_tx, create_raw_legacy_tx, create_raw_tx_1559, recover_address,
 };
 use ic_cdk::export::Principal;
 
 use futures::executor::block_on;
-pub struct EVMTransactionLegacy {
-    pub nonce: usize,
-    pub gas_price: usize,
-    pub gas_limit: usize,
-    pub to: String,
-    pub value: usize,
-    pub data: String,
-}
-pub struct EVMTransactionEIP2930 {
-    pub chain_id: usize,
-    pub nonce: usize,
-    pub gas_price: usize,
-    pub gas_limit: usize,
-    pub to: String,
-    pub value: usize,
-    pub data: String,
-    pub access_list: Vec<u8>,
-}
-pub struct EVMTransactionEIP1559 {
-    pub chain_id: usize,
-    pub nonce: usize,
-    pub max_priority_fee_per_gas: usize,
-    pub gas_limit: usize,
-    pub max_fee_per_gas: usize,
-    pub to: String,
-    pub value: usize,
-    pub data: String,
-    pub access_list: Vec<u8>,
-}
 
 #[test]
 fn create_new_user() {

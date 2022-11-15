@@ -1,5 +1,5 @@
-use crate::types::reply::{ECDSAPublicKeyReply, SignWithECDSAReply};
-use crate::types::request::SignWithECDSA;
+use crate::ecdsa::reply::{ECDSAPublicKeyReply, SignWithECDSAReply};
+use crate::ecdsa::request::SignWithECDSA;
 use crate::utils::generate_random_private_key;
 use candid::de::IDLDeserialize;
 use candid::utils::{ArgumentDecoder, ArgumentEncoder};
@@ -10,7 +10,7 @@ use libsecp256k1::{PublicKey, SecretKey};
 use std::cell::RefCell;
 use std::future::Future;
 
-pub struct State {
+struct State {
     private_key: SecretKey,
 }
 

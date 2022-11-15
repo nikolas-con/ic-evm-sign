@@ -63,7 +63,7 @@ describe("Sign EVM Transactions", function () {
       gasLimit: "0x7530",
       to: await user2.getAddress(),
       value: ethers.utils.parseEther(value).toHexString(),
-      data: "0x000000000000000000000000000000000000000000000000000000000000000000000000",
+      data: "0x00",
     };
 
     const tx = createRawTxLegacy(txParams);
@@ -98,7 +98,7 @@ describe("Sign EVM Transactions", function () {
     });
 
     const txData = {
-      data: "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      data: "0x00",
       gasLimit: "0x7A28",
       maxPriorityFeePerGas: "0x59682f00",
       maxFeePerGas: await ethers.provider
@@ -144,7 +144,7 @@ describe("Sign EVM Transactions", function () {
     });
 
     const txData = {
-      data: "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      data: "0x00",
       gasLimit: "0x7A28",
       maxPriorityFeePerGas: "0x59682f00",
       gasPrice: await ethers.provider

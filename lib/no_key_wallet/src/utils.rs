@@ -1,5 +1,5 @@
 #[cfg(test)]
-use crate::tests::{EVMTransactionEIP1559, EVMTransactionEIP2930, EVMTransactionLegacy};
+use crate::transaction::{EVMTransactionEIP1559, EVMTransactionEIP2930, EVMTransactionLegacy};
 use easy_hasher::easy_hasher;
 use ic_cdk::export::Principal;
 

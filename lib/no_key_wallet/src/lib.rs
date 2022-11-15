@@ -2,29 +2,51 @@
 use ic_cdk::api::time as ic_timestamp;
 #[cfg(not(test))]
 use ic_cdk::call as ic_call;
-use ic_cdk::export::{candid::CandidType, serde::Deserialize, Principal};
+use ic_cdk::export::{
+    candid::CandidType,
+    serde::{Deserialize, Serialize},
+    Principal,
+};
 #[cfg(test)]
 mod mocks;
 #[cfg(test)]
 use mocks::{ic_call, ic_timestamp};
+
 pub mod utils;
 use utils::{compute_address, get_derivation_path, get_rec_id};
 
-use std::cell::RefCell;
+pub mod ecdsa;
+use ecdsa::reply::*;
+use ecdsa::request::*;
 
-use std::collections::HashMap;
-
-pub mod types;
-
-use types::reply::*;
-use types::request::*;
-use types::response::*;
-use types::state::*;
+pub mod state;
+use state::*;
 
 mod transaction;
 
+use std::cell::RefCell;
+use std::collections::HashMap;
+
+#[derive(CandidType, Serialize, Debug)]
+pub struct CreateResponse {
+    pub address: String,
+}
+#[derive(CandidType, Deserialize, Debug)]
+pub struct SignResponse {
+    pub sign_tx: Vec<u8>,
+}
+#[derive(CandidType, Deserialize, Debug)]
+pub struct CallerTransactionsResponse {
+    pub transactions: Vec<Transaction>,
+}
+#[derive(CandidType, Deserialize, Debug)]
+pub struct CallerResponse {
+    pub address: String,
+    pub transactions: Vec<Transaction>,
+}
+
 #[derive(Default, CandidType, Deserialize, Debug)]
-pub struct State {
+struct State {
     users: HashMap<Principal, User>,
 }
 

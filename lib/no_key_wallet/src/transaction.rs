@@ -10,6 +10,35 @@ pub struct TransactionData {
     hex: Vec<u8>,
     chain_id: usize,
 }
+pub struct EVMTransactionLegacy {
+    pub nonce: usize,
+    pub gas_price: usize,
+    pub gas_limit: usize,
+    pub to: String,
+    pub value: usize,
+    pub data: String,
+}
+pub struct EVMTransactionEIP2930 {
+    pub chain_id: usize,
+    pub nonce: usize,
+    pub gas_price: usize,
+    pub gas_limit: usize,
+    pub to: String,
+    pub value: usize,
+    pub data: String,
+    pub access_list: Vec<u8>,
+}
+pub struct EVMTransactionEIP1559 {
+    pub chain_id: usize,
+    pub nonce: usize,
+    pub max_priority_fee_per_gas: usize,
+    pub gas_limit: usize,
+    pub max_fee_per_gas: usize,
+    pub to: String,
+    pub value: usize,
+    pub data: String,
+    pub access_list: Vec<u8>,
+}
 
 pub trait Sign {
     fn get_message_to_sign(&self) -> Result<Vec<u8>, String>;
@@ -290,9 +319,7 @@ pub fn get_transaction(hex_raw_tx: &Vec<u8>, chain_id: usize) -> Result<Box<dyn 
 }
 
 fn get_transaction_type(hex_raw_tx: &Vec<u8>) -> Result<TransactionType, String> {
-    if (hex_raw_tx[0] >= 0xc0 && hex_raw_tx[0] <= 0xf7)
-        || (hex_raw_tx[0] >= 0xf8 && hex_raw_tx[0] <= 0xff)
-    {
+    if hex_raw_tx[0] >= 0xc0 {
         Ok(TransactionType::Legacy)
     } else if hex_raw_tx[0] == 0x01 {
         Ok(TransactionType::EPI2930)

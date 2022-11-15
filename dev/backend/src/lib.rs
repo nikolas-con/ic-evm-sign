@@ -1,7 +1,7 @@
 use ic_cdk::export::candid::CandidType;
 use ic_cdk_macros::*;
 use no_key_wallet;
-use no_key_wallet::types::state::Transaction;
+use no_key_wallet::state::Transaction;
 
 #[derive(Debug, CandidType)]
 struct CreateResponse {
