@@ -9,8 +9,8 @@
     },
     "identity": {
       "type": "custom",
-      "candid": "dev/frontend/canisters/identity/identity.did",
-      "wasm": "dev/frontend/canisters/identity/identity.wasm"
+      "candid": "dev/identity/identity.did",
+      "wasm": "dev/identity/identity.wasm"
     }
   },
   "defaults": {
