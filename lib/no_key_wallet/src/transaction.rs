@@ -6,7 +6,6 @@ enum TransactionType {
     EPI2930,
 }
 #[derive(Debug)]
-
 pub struct TransactionData {
     hex: Vec<u8>,
     chain_id: usize,
@@ -15,6 +14,9 @@ pub struct TransactionData {
 pub trait Sign {
     fn get_message_to_sign(&self) -> Result<Vec<u8>, String>;
     fn signed(&self, signature: Vec<u8>, rec_id: usize) -> Result<Vec<u8>, String>;
+    fn is_signed(&self) -> bool;
+    fn get_signature(&self) -> Result<Vec<u8>, String>;
+    fn get_recovery_id(&self) -> Result<u8, String>;
 }
 
 pub struct TransactionLegacy {
@@ -68,6 +70,33 @@ impl Sign for TransactionLegacy {
 
         Ok(stream.out())
     }
+    fn is_signed(&self) -> bool {
+        let rlp = rlp::Rlp::new(&self.data.hex);
+        let r_is_empty = rlp.at(7).is_empty();
+        let s_is_empty = rlp.at(8).is_empty();
+
+        !r_is_empty && !s_is_empty
+    }
+    fn get_signature(&self) -> Result<Vec<u8>, String> {
+        if !self.is_signed() {
+            return Err("This is not  a signed transaction".to_string());
+        }
+        let rlp = rlp::Rlp::new(&self.data.hex);
+        let r = rlp.at(7).as_val::<Vec<u8>>();
+        let s = rlp.at(8).as_val::<Vec<u8>>();
+
+        Ok([&r[..], &s[..]].concat())
+    }
+    fn get_recovery_id(&self) -> Result<u8, String> {
+        if !self.is_signed() {
+            return Err("This is not  a signed transaction".to_string());
+        }
+        let rlp = rlp::Rlp::new(&self.data.hex[..]);
+        let chain_id = i8::try_from(self.data.chain_id).unwrap();
+        let v = rlp.at(6).as_val::<Vec<u8>>();
+        let recovery_id = -1 * ((chain_id * 2) + 35 - i8::try_from(v[0]).unwrap());
+        Ok(u8::try_from(recovery_id).unwrap())
+    }
 }
 
 pub struct Transaction1559 {
@@ -78,17 +107,15 @@ impl Sign for Transaction1559 {
         let rlp = rlp::Rlp::new(&self.data.hex[1..]);
 
         let mut stream = rlp::RlpStream::new_list(9);
-        for i in 0..=8 {
-            if i == 8 {
-                let item = rlp.at(i);
-                let raw = item.as_raw();
-                let item_count: usize = 1;
-                stream.append_raw(raw, item_count);
-            } else {
-                let item = rlp.at(i).as_val::<Vec<u8>>();
-                stream.append(&item);
-            }
+        for i in 0..=7 {
+            let item = rlp.at(i).as_val::<Vec<u8>>();
+            stream.append(&item);
         }
+
+        let item = rlp.at(8);
+        let raw = item.as_raw();
+        let item_count: usize = 1;
+        stream.append_raw(raw, item_count);
 
         let decode_tx = stream.out();
 
@@ -126,6 +153,36 @@ impl Sign for Transaction1559 {
         }
         Ok([&self.data.hex[..1], &stream.out()].concat())
     }
+    fn is_signed(&self) -> bool {
+        let rlp = rlp::Rlp::new(&self.data.hex[1..]);
+        let r_is_empty = rlp.at(10).is_empty();
+        let s_is_empty = rlp.at(11).is_empty();
+
+        !r_is_empty && !s_is_empty
+    }
+    fn get_signature(&self) -> Result<Vec<u8>, String> {
+        if !self.is_signed() {
+            return Err("This is not  a signed transaction".to_string());
+        }
+        let rlp = rlp::Rlp::new(&self.data.hex[1..]);
+        let r = rlp.at(10).as_val::<Vec<u8>>();
+        let s = rlp.at(11).as_val::<Vec<u8>>();
+
+        Ok([&r[..], &s[..]].concat())
+    }
+    fn get_recovery_id(&self) -> Result<u8, String> {
+        if !self.is_signed() {
+            return Err("This is not  a signed transaction".to_string());
+        }
+        let rlp = rlp::Rlp::new(&self.data.hex[1..]);
+        let v = rlp.at(9);
+
+        if v.is_empty() {
+            Ok(0 as u8)
+        } else {
+            Ok(1 as u8)
+        }
+    }
 }
 
 pub struct Transaction2930 {
@@ -134,20 +191,17 @@ pub struct Transaction2930 {
 impl Sign for Transaction2930 {
     fn get_message_to_sign(&self) -> Result<Vec<u8>, String> {
         let rlp = rlp::Rlp::new(&self.data.hex[1..]);
-
         let mut stream = rlp::RlpStream::new_list(8);
 
-        for i in 0..=7 {
-            if i == 7 {
-                let item = rlp.at(i);
-                let raw = item.as_raw();
-                let item_count: usize = 1;
-                stream.append_raw(raw, item_count);
-            } else {
-                let item = rlp.at(i).as_val::<Vec<u8>>();
-                stream.append(&item);
-            }
+        for i in 0..=6 {
+            let item = rlp.at(i).as_val::<Vec<u8>>();
+            stream.append(&item);
         }
+
+        let item = rlp.at(7);
+        let raw = item.as_raw();
+        let item_count: usize = 1;
+        stream.append_raw(raw, item_count);
         let decode_tx = stream.out();
 
         let msg = [&self.data.hex[..1], &decode_tx[..]].concat();
@@ -184,6 +238,37 @@ impl Sign for Transaction2930 {
         }
         Ok([&self.data.hex[..1], &stream.out()].concat())
     }
+
+    fn is_signed(&self) -> bool {
+        let rlp = rlp::Rlp::new(&self.data.hex[1..]);
+        let r_is_empty = rlp.at(9).is_empty();
+        let s_is_empty = rlp.at(10).is_empty();
+
+        !r_is_empty && !s_is_empty
+    }
+    fn get_signature(&self) -> Result<Vec<u8>, String> {
+        if !self.is_signed() {
+            return Err("This is not  a signed transaction".to_string());
+        }
+        let rlp = rlp::Rlp::new(&self.data.hex[1..]);
+        let r = rlp.at(9).as_val::<Vec<u8>>();
+        let s = rlp.at(10).as_val::<Vec<u8>>();
+
+        Ok([&r[..], &s[..]].concat())
+    }
+    fn get_recovery_id(&self) -> Result<u8, String> {
+        if !self.is_signed() {
+            return Err("This is not  a signed transaction".to_string());
+        }
+        let rlp = rlp::Rlp::new(&self.data.hex[1..]);
+        let v = rlp.at(8);
+
+        if v.is_empty() {
+            Ok(0 as u8)
+        } else {
+            Ok(1 as u8)
+        }
+    }
 }
 
 pub fn get_transaction(hex_raw_tx: &Vec<u8>, chain_id: usize) -> Result<Box<dyn Sign>, String> {
@@ -205,13 +290,15 @@ pub fn get_transaction(hex_raw_tx: &Vec<u8>, chain_id: usize) -> Result<Box<dyn 
 }
 
 fn get_transaction_type(hex_raw_tx: &Vec<u8>) -> Result<TransactionType, String> {
-    if hex_raw_tx[0] == 0xf8 {
-        return Ok(TransactionType::Legacy);
+    if (hex_raw_tx[0] >= 0xc0 && hex_raw_tx[0] <= 0xf7)
+        || (hex_raw_tx[0] >= 0xf8 && hex_raw_tx[0] <= 0xff)
+    {
+        Ok(TransactionType::Legacy)
     } else if hex_raw_tx[0] == 0x01 {
-        return Ok(TransactionType::EPI2930);
+        Ok(TransactionType::EPI2930)
     } else if hex_raw_tx[0] == 0x02 {
-        return Ok(TransactionType::EIP1559);
+        Ok(TransactionType::EIP1559)
     } else {
-        return Err(String::from("Invalid type"));
+        Err(String::from("Invalid type"))
     }
 }
