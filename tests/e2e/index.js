@@ -1,58 +1,24 @@
 const { Actor, HttpAgent } = require("@dfinity/agent");
 const { Principal } = require("@dfinity/principal");
-
-const { Chain, Common, Hardfork } = require("@ethereumjs/common");
 const {
-  Transaction,
-  FeeMarketEIP1559Transaction,
-  AccessListEIP2930Transaction,
-} = require("@ethereumjs/tx");
-
-const { assert } = require("chai");
-const { ethers } = require("hardhat");
+  createRawTx1559,
+  createRawTx2930,
+  createRawTxLegacy,
+  signTx,
+} = require("./utils");
+const { idleServiceOptions } = require("./utils/idleService");
 
 const path = require("path");
 const fetch = require("node-fetch");
 global.fetch = fetch;
 
-describe("sign traduction", function () {
+const { assert } = require("chai");
+const { ethers } = require("hardhat");
+
+describe("Sign EVM Transactions", function () {
   let actor;
 
   before(async () => {
-    const idleServiceOptions = (IDL) => {
-      const transactions = IDL.Record({
-        data: IDL.Vec(IDL.Nat8),
-        timestamp: IDL.Nat64,
-      });
-      const create_response = IDL.Record({
-        address: IDL.Text,
-      });
-      const sign_tx_response = IDL.Record({
-        sign_tx: IDL.Vec(IDL.Nat8),
-      });
-      const caller_response = IDL.Record({
-        address: IDL.Text,
-        transactions: IDL.Vec(transactions),
-      });
-
-      return {
-        create: IDL.Func(
-          [],
-          [IDL.Variant({ Ok: create_response, Err: IDL.Text })],
-          []
-        ),
-        sign_evm_tx: IDL.Func(
-          [IDL.Vec(IDL.Nat8), IDL.Nat64],
-          [IDL.Variant({ Ok: sign_tx_response, Err: IDL.Text })],
-          []
-        ),
-        get_caller_data: IDL.Func(
-          [],
-          [IDL.Variant({ Ok: caller_response, Err: IDL.Text })],
-          ["query"]
-        ),
-      };
-    };
     const idlFactory = ({ IDL }) => IDL.Service(idleServiceOptions(IDL));
 
     const canisters = require(path.resolve(
@@ -72,7 +38,7 @@ describe("sign traduction", function () {
     actor = Actor.createActor(idlFactory, createActorOptions);
   });
 
-  it("sign traduction e2e legacy", async function () {
+  it("Sign Legacy Transaction", async function () {
     const [owner, user2] = await ethers.getSigners();
     const value = "1";
     let address;
@@ -86,16 +52,18 @@ describe("sign traduction", function () {
 
     await owner.sendTransaction({
       to: address,
-      value: ethers.utils.parseEther("15"),
+      value: ethers.utils.parseEther("2"),
     });
 
     const txParams = {
       nonce: await ethers.provider.getTransactionCount(address),
-      gasPrice: "0x09184e72a000",
+      gasPrice: await ethers.provider
+        .getGasPrice()
+        .then((s) => s.toHexString()),
       gasLimit: "0x7530",
       to: await user2.getAddress(),
       value: ethers.utils.parseEther(value).toHexString(),
-      data: "0x7f7465737432000000000000000000000000000000000000000000000000000000600057",
+      data: "0x000000000000000000000000000000000000000000000000000000000000000000000000",
     };
 
     const tx = createRawTxLegacy(txParams);
@@ -108,16 +76,11 @@ describe("sign traduction", function () {
 
     await ethers.provider.waitForTransaction(hash);
 
-    const icAfter = await ethers.provider.getBalance(address);
-
     const user2After = await user2.getBalance();
-
-    console.log("user2After", ethers.utils.formatEther(user2After));
-    console.log("user2Before", ethers.utils.formatEther(user2Before));
 
     assert.ok(user2After.sub(user2Before).eq(ethers.utils.parseEther(value)));
   });
-  it("sign traduction e2e 1559", async function () {
+  it("Sign EIP1559 Transaction", async function () {
     const [owner, user2] = await ethers.getSigners();
     const value = "0.5";
     let address;
@@ -128,11 +91,10 @@ describe("sign traduction", function () {
       const res = await actor.get_caller_data();
       address = res.Ok.address;
     }
-    console.log(address);
 
     await owner.sendTransaction({
       to: address,
-      value: ethers.utils.parseEther("200"),
+      value: ethers.utils.parseEther("2"),
     });
 
     const txData = {
@@ -146,15 +108,7 @@ describe("sign traduction", function () {
       to: await user2.getAddress(),
       value: ethers.utils.parseEther(value).toHexString(),
       chainId: "0x01",
-      accessList: [
-        {
-          address: "0x0000000000000000000000000000000000000101",
-          storageKeys: [
-            "0x0000000000000000000000000000000000000000000000000000000000000000",
-            "0x00000000000000000000000000000000000000000000000000000000000060a7",
-          ],
-        },
-      ],
+      accessList: [],
       type: "0x02",
     };
 
@@ -168,16 +122,11 @@ describe("sign traduction", function () {
 
     await ethers.provider.waitForTransaction(hash);
 
-    const icAfter = await ethers.provider.getBalance(address);
-
     const user2After = await user2.getBalance();
-
-    console.log("user2After", ethers.utils.formatEther(user2After));
-    console.log("user2Before", ethers.utils.formatEther(user2Before));
 
     assert.ok(user2After.sub(user2Before).eq(ethers.utils.parseEther(value)));
   });
-  it("sign traduction e2e 2930", async function () {
+  it("Sign EIP2930 Transaction", async function () {
     const [owner, user2] = await ethers.getSigners();
     const value = "1";
     let address;
@@ -188,13 +137,12 @@ describe("sign traduction", function () {
       const res = await actor.get_caller_data();
       address = res.Ok.address;
     }
-    console.log(address);
 
     await owner.sendTransaction({
       to: address,
       value: ethers.utils.parseEther("200"),
     });
-    console.log(ethers.utils.parseEther(value));
+
     const txData = {
       data: "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
       gasLimit: "0x7A28",
@@ -206,15 +154,7 @@ describe("sign traduction", function () {
       to: await user2.getAddress(),
       value: ethers.utils.parseEther(value).toHexString(),
       chainId: "0x01",
-      accessList: [
-        {
-          address: "0x0000000000000000000000000000000000000101",
-          storageKeys: [
-            "0x0000000000000000000000000000000000000000000000000000000000000000",
-            "0x00000000000000000000000000000000000000000000000000000000000060a7",
-          ],
-        },
-      ],
+      accessList: [],
       type: "0x01",
     };
 
@@ -228,53 +168,8 @@ describe("sign traduction", function () {
 
     await ethers.provider.waitForTransaction(hash);
 
-    const icAfter = await ethers.provider.getBalance(address);
-
     const user2After = await user2.getBalance();
-
-    console.log("user2After", ethers.utils.formatEther(user2After));
-    console.log("user2Before", ethers.utils.formatEther(user2Before));
 
     assert.ok(user2After.sub(user2Before).eq(ethers.utils.parseEther(value)));
   });
 });
-
-const createRawTxLegacy = (txParams) => {
-  const common = new Common({
-    chain: Chain.Mainnet,
-    hardfork: Hardfork.SpuriousDragon,
-  });
-
-  const tx = Transaction.fromTxData(txParams, { common });
-
-  return tx;
-};
-const createRawTx1559 = (txParams) => {
-  const common = new Common({
-    chain: Chain.Mainnet,
-    hardfork: Hardfork.London,
-  });
-
-  const tx = FeeMarketEIP1559Transaction.fromTxData(txParams, { common });
-
-  return tx;
-};
-const createRawTx2930 = (txParams) => {
-  const common = new Common({
-    chain: Chain.Mainnet,
-    hardfork: Hardfork.Berlin,
-  });
-
-  const tx = AccessListEIP2930Transaction.fromTxData(txParams, { common });
-
-  return tx;
-};
-
-const signTx = async (rawTX, actor) => {
-  const serializedTx = rawTX.serialize();
-  const { chainId } = await ethers.provider.getNetwork();
-
-  const res = await actor.sign_evm_tx([...serializedTx], chainId);
-
-  return "0x" + Buffer.from(res.Ok.sign_tx, "hex").toString("hex");
-};
