@@ -17,6 +17,7 @@ const { ethers } = require("hardhat");
 
 describe("Sign EVM Transactions", function () {
   let actor;
+  let otherUser;
 
   before(async () => {
     const idlFactory = ({ IDL }) => IDL.Service(idleServiceOptions(IDL));
@@ -36,157 +37,154 @@ describe("Sign EVM Transactions", function () {
 
     const createActorOptions = { agent, canisterId };
     actor = Actor.createActor(idlFactory, createActorOptions);
-  });
 
-  it("Sign Legacy Transaction", async function () {
-    const [owner, user2] = await ethers.getSigners();
-    const value = "1";
-    let address;
-    try {
-      const res = await actor.create();
-      address = res.Ok.address;
-    } catch (error) {
-      const res = await actor.get_caller_data();
-      address = res.Ok.address;
-    }
+    const res = await actor.create();
+
+    const address = res.Ok.address;
+    const [owner, user] = await ethers.getSigners();
+
+    otherUser = user;
 
     await owner.sendTransaction({
       to: address,
-      value: ethers.utils.parseEther("2"),
+      value: ethers.utils.parseEther("10"),
     });
+  });
+
+  it("Sign Legacy Transaction", async function () {
+    const res = await actor.get_caller_data();
+    const address = res.Ok.address;
+
+    const nonce = await ethers.provider.getTransactionCount(address);
+    const gasPrice = await ethers.provider
+      .getGasPrice()
+      .then((s) => s.toHexString());
+    const gasLimit = ethers.BigNumber.from("23000").toHexString();
+    const to = await otherUser.getAddress();
+    const value = "1";
+    const value_hex = ethers.utils.parseEther(value).toHexString();
+    const data = ethers.BigNumber.from("0").toHexString();
 
     const txParams = {
-      nonce: await ethers.provider.getTransactionCount(address),
-      gasPrice: await ethers.provider
-        .getGasPrice()
-        .then((s) => s.toHexString()),
-      gasLimit: "0x7530",
-      to: await user2.getAddress(),
-      value: ethers.utils.parseEther(value).toHexString(),
-      data: "0x00",
+      nonce,
+      gasPrice,
+      gasLimit,
+      to,
+      value: value_hex,
+      data,
     };
 
     const tx = createRawTxLegacy(txParams);
 
     const signedTx = await signTx(tx, actor);
 
-    const user2Before = await user2.getBalance();
+    const otherUserBefore = await otherUser.getBalance();
 
     const { hash } = await ethers.provider.sendTransaction(signedTx);
 
     await ethers.provider.waitForTransaction(hash);
 
-    const user2After = await user2.getBalance();
+    const otherUserAfter = await otherUser.getBalance();
 
-    assert.ok(user2After.sub(user2Before).eq(ethers.utils.parseEther(value)));
+    assert.ok(
+      otherUserAfter.sub(otherUserBefore).eq(ethers.utils.parseEther(value))
+    );
   });
   it("Sign EIP1559 Transaction", async function () {
-    const [owner, user2] = await ethers.getSigners();
-    const value = "0.5";
-    let address;
-    try {
-      const res = await actor.create();
-      address = res.Ok.address;
-    } catch (error) {
-      const res = await actor.get_caller_data();
-      address = res.Ok.address;
-    }
+    const res = await actor.get_caller_data();
+    const address = res.Ok.address;
 
-    await owner.sendTransaction({
-      to: address,
-      value: ethers.utils.parseEther("2"),
-    });
+    const nonce = await ethers.provider.getTransactionCount(address);
+    const { maxFeePerGas, maxPriorityFeePerGas } =
+      await ethers.provider.getFeeData();
+    const gasLimit = ethers.BigNumber.from("23000").toHexString();
+    const to = await otherUser.getAddress();
+    const value = "1";
+    const value_hex = ethers.utils.parseEther(value).toHexString();
+    const data = ethers.BigNumber.from("0").toHexString();
+    const chainId = await ethers.provider
+      .getNetwork()
+      .then((v) => ethers.BigNumber.from(v.chainId.toString()));
+    const type = ethers.BigNumber.from("2").toHexString();
 
     const txData = {
-      data: "0x00",
-      gasLimit: "0x7A28",
-      maxPriorityFeePerGas: "0x59682f00",
-      maxFeePerGas: await ethers.provider
-        .getGasPrice()
-        .then((s) => s.toHexString()),
-      nonce: await ethers.provider.getTransactionCount(address),
-      to: await user2.getAddress(),
-      value: ethers.utils.parseEther(value).toHexString(),
-      chainId: "0x01",
+      data,
+      gasLimit,
+      maxPriorityFeePerGas: maxPriorityFeePerGas.toHexString(),
+      maxFeePerGas: maxFeePerGas.toHexString(),
+      nonce,
+      to,
+      value: value_hex,
+      chainId: chainId.toHexString(),
       accessList: [],
-      type: "0x02",
+      type,
     };
 
     const tx = createRawTx1559(txData);
 
     const signedTx = await signTx(tx, actor);
 
-    const user2Before = await user2.getBalance();
+    const otherUserBefore = await otherUser.getBalance();
 
     const { hash } = await ethers.provider.sendTransaction(signedTx);
 
     await ethers.provider.waitForTransaction(hash);
 
-    const user2After = await user2.getBalance();
+    const otherUserAfter = await otherUser.getBalance();
 
-    assert.ok(user2After.sub(user2Before).eq(ethers.utils.parseEther(value)));
+    assert.ok(
+      otherUserAfter.sub(otherUserBefore).eq(ethers.utils.parseEther(value))
+    );
   });
   it("Sign EIP2930 Transaction", async function () {
-    const [owner, user2] = await ethers.getSigners();
-    const value = "1";
-    let address;
-    try {
-      const res = await actor.create();
-      address = res.Ok.address;
-    } catch (error) {
-      const res = await actor.get_caller_data();
-      address = res.Ok.address;
-    }
+    const res = await actor.get_caller_data();
+    const address = res.Ok.address;
 
-    await owner.sendTransaction({
-      to: address,
-      value: ethers.utils.parseEther("200"),
-    });
+    const nonce = await ethers.provider.getTransactionCount(address);
+    const { maxPriorityFeePerGas, gasPrice } =
+      await ethers.provider.getFeeData();
+    const gasLimit = ethers.BigNumber.from("23000").toHexString();
+    const to = await otherUser.getAddress();
+    const value = "1";
+    const value_hex = ethers.utils.parseEther(value).toHexString();
+    const data = ethers.BigNumber.from("0").toHexString();
+    const chainId = await ethers.provider
+      .getNetwork()
+      .then((v) => ethers.BigNumber.from(v.chainId.toString()));
+    const type = ethers.BigNumber.from("1").toHexString();
 
     const txData = {
-      data: "0x00",
-      gasLimit: "0x7A28",
-      maxPriorityFeePerGas: "0x59682f00",
-      gasPrice: await ethers.provider
-        .getGasPrice()
-        .then((s) => s.toHexString()),
-      nonce: await ethers.provider.getTransactionCount(address),
-      to: await user2.getAddress(),
-      value: ethers.utils.parseEther(value).toHexString(),
-      chainId: "0x01",
+      data,
+      gasLimit,
+      maxPriorityFeePerGas: maxPriorityFeePerGas.toHexString(),
+      gasPrice: gasPrice.toHexString(),
+      nonce,
+      to,
+      value: value_hex,
+      chainId: chainId.toHexString(),
       accessList: [],
-      type: "0x01",
+      type,
     };
 
     const tx = createRawTx2930(txData);
 
     const signedTx = await signTx(tx, actor);
 
-    const user2Before = await user2.getBalance();
+    const otherUserBefore = await otherUser.getBalance();
 
     const { hash } = await ethers.provider.sendTransaction(signedTx);
 
     await ethers.provider.waitForTransaction(hash);
 
-    const user2After = await user2.getBalance();
+    const otherUserAfter = await otherUser.getBalance();
 
-    assert.ok(user2After.sub(user2Before).eq(ethers.utils.parseEther(value)));
+    assert.ok(
+      otherUserAfter.sub(otherUserBefore).eq(ethers.utils.parseEther(value))
+    );
   });
   it("Deploy and used a contract", async function () {
-    const [owner, user2] = await ethers.getSigners();
-    let address;
-    try {
-      const res = await actor.create();
-      address = res.Ok.address;
-    } catch (error) {
-      const res = await actor.get_caller_data();
-      address = res.Ok.address;
-    }
-
-    await owner.sendTransaction({
-      to: address,
-      value: ethers.utils.parseEther("10"),
-    });
+    const res = await actor.get_caller_data();
+    const address = res.Ok.address;
 
     const contract = await ethers.getContractFactory("Example");
 
@@ -199,17 +197,27 @@ describe("Sign EVM Transactions", function () {
     const { maxFeePerGas, maxPriorityFeePerGas } =
       await ethers.provider.getFeeData();
 
+    let nonce = await ethers.provider.getTransactionCount(address);
+
+    const value = ethers.BigNumber.from("0");
+
+    const chainId = await ethers.provider
+      .getNetwork()
+      .then((v) => ethers.BigNumber.from(v.chainId.toString()));
+
+    const type = ethers.BigNumber.from("2");
+
     const txDataDeployContract = {
       data,
       gasLimit: estimatedGasDeploy.toHexString(),
       maxPriorityFeePerGas: maxPriorityFeePerGas.toHexString(),
       maxFeePerGas: maxFeePerGas.toHexString(),
-      nonce: await ethers.provider.getTransactionCount(address),
+      nonce,
       to: null,
-      value: "0x00",
-      chainId: "0x01",
+      value: value.toHexString(),
+      chainId: chainId.toHexString(),
       accessList: [],
-      type: "0x02",
+      type: type.toHexString(),
     };
 
     const deployContractTx = createRawTx1559(txDataDeployContract);
@@ -229,7 +237,6 @@ describe("Sign EVM Transactions", function () {
     );
 
     const nameBefore = await deployedContract.name();
-    console.log(nameBefore);
 
     assert.ok(nameBefore === "foo");
 
@@ -238,18 +245,19 @@ describe("Sign EVM Transactions", function () {
 
     const setNameEncoded = iface.encodeFunctionData("setName", ["bar"]);
     const gasLimit = await deployedContract.estimateGas.setName("bar");
+    nonce = await ethers.provider.getTransactionCount(address);
 
     const txData = {
       data: setNameEncoded,
       gasLimit: gasLimit.toHexString(),
       maxPriorityFeePerGas: maxPriorityFeePerGas.toHexString(),
       maxFeePerGas: maxFeePerGas.toHexString(),
-      nonce: await ethers.provider.getTransactionCount(address),
+      nonce,
       to: deployedContract.address,
-      value: "0x00",
-      chainId: "0x01",
+      value: value.toHexString(),
+      chainId: chainId.toHexString(),
       accessList: [],
-      type: "0x02",
+      type: type.toHexString(),
     };
 
     const tx = createRawTx1559(txData);
@@ -261,7 +269,6 @@ describe("Sign EVM Transactions", function () {
     await ethers.provider.waitForTransaction(hash2);
 
     const nameAfter = await deployedContract.name();
-    console.log(nameAfter);
     assert.ok(nameAfter === "bar");
   });
 });
