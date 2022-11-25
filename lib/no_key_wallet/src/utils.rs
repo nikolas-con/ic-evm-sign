@@ -1,4 +1,3 @@
-#[cfg(test)]
 use crate::transaction::{EVMTransactionEIP1559, EVMTransactionEIP2930, EVMTransactionLegacy};
 use easy_hasher::easy_hasher;
 use ic_cdk::export::Principal;
@@ -43,11 +42,17 @@ pub fn get_rec_id(
     return Err("Not found".to_string());
 }
 
-pub fn string_to_vev_u8(str: &str) -> Vec<u8> {
+pub fn string_to_vec_u8(str: &str) -> Vec<u8> {
     (0..str.len())
         .step_by(2)
         .map(|i| u8::from_str_radix(&str[i..i + 2], 16).unwrap())
         .collect::<Vec<u8>>()
+}
+pub fn usize_to_vec_u8(u: usize) -> Vec<u8> {
+    u.to_be_bytes()
+        .into_iter()
+        .skip_while(|&x| x == 0)
+        .collect()
 }
 
 #[cfg(test)]
@@ -60,86 +65,63 @@ pub fn generate_random_private_key() -> libsecp256k1::SecretKey {
         }
     }
 }
-#[cfg(test)]
 pub fn create_raw_legacy_tx(arg: EVMTransactionLegacy) -> Vec<u8> {
     let mut stream = rlp::RlpStream::new_list(9);
 
-    if arg.nonce == 0 {
+    let nonce = usize_to_vec_u8(arg.nonce);
+    stream.append(&nonce);
+
+    let gas_price = usize_to_vec_u8(arg.gas_price);
+    stream.append(&gas_price);
+
+    let gas_limit = usize_to_vec_u8(arg.gas_limit);
+    stream.append(&gas_limit);
+
+    let to = string_to_vec_u8(&arg.to[2..]);
+    stream.append(&to);
+
+    let value = usize_to_vec_u8(arg.value);
+    stream.append(&value);
+
+    let data = string_to_vec_u8(&arg.data[2..]);
+    stream.append(&data);
+
+    for _i in 0..3 {
         stream.append_empty_data();
-    } else {
-        let nonce = format!("{:02x}", arg.nonce);
-        let nonce_to_vev_u8 = string_to_vev_u8(&nonce);
-        stream.append(&nonce_to_vev_u8);
     }
-
-    let gas_price = format!("{:010x}", arg.gas_price);
-    let gas_price_to_vev_u8 = string_to_vev_u8(&gas_price);
-    stream.append(&gas_price_to_vev_u8);
-
-    let gas_limit = format!("{:02x}", arg.gas_limit);
-    let gas_limit_to_vev_u8 = string_to_vev_u8(&gas_limit);
-    stream.append(&gas_limit_to_vev_u8);
-
-    let to = arg.to;
-    let to_to_vev_u8 = string_to_vev_u8(&to[2..]);
-    stream.append(&to_to_vev_u8);
-
-    let value = format!("{:020x}", arg.value);
-    let value_to_vev_u8 = string_to_vev_u8(&value);
-    stream.append(&value_to_vev_u8);
-
-    let data = arg.data;
-    let data_to_vev_u8 = string_to_vev_u8(&data[2..]);
-    stream.append(&data_to_vev_u8);
-
-    stream.append_empty_data();
-    stream.append_empty_data();
-    stream.append_empty_data();
 
     stream.out().to_vec()
 }
 
-#[cfg(test)]
 pub fn create_raw_eip_2930_tx(arg: EVMTransactionEIP2930) -> Vec<u8> {
     let mut stream = rlp::RlpStream::new_list(11);
 
-    let chain_id = format!("{:02x}", arg.chain_id);
-    let chain_id_vev_u8 = string_to_vev_u8(&chain_id);
-    stream.append(&chain_id_vev_u8);
+    let chain_id = usize_to_vec_u8(arg.chain_id);
+    stream.append(&chain_id);
 
-    if arg.nonce == 0 {
-        stream.append_empty_data();
-    } else {
-        let nonce = format!("{:02x}", arg.nonce);
-        let nonce_to_vev_u8 = string_to_vev_u8(&nonce);
-        stream.append(&nonce_to_vev_u8);
-    }
+    let nonce = usize_to_vec_u8(arg.nonce);
+    stream.append(&nonce);
 
-    let gas_price = format!("{:010x}", arg.gas_price);
-    let gas_price_to_vev_u8 = string_to_vev_u8(&gas_price);
-    stream.append(&gas_price_to_vev_u8);
+    let gas_price = usize_to_vec_u8(arg.gas_price);
+    stream.append(&gas_price);
 
-    let gas_limit = format!("{:02x}", arg.gas_limit);
-    let gas_limit_to_vev_u8 = string_to_vev_u8(&gas_limit);
-    stream.append(&gas_limit_to_vev_u8);
+    let gas_limit = usize_to_vec_u8(arg.gas_limit);
+    stream.append(&gas_limit);
 
-    let to = arg.to;
-    let to_to_vev_u8 = string_to_vev_u8(&to[2..]);
-    stream.append(&to_to_vev_u8);
+    let to = string_to_vec_u8(&arg.to[2..]);
+    stream.append(&to);
 
-    let value = format!("{:020x}", arg.value);
-    let value_to_vev_u8 = string_to_vev_u8(&value);
-    stream.append(&value_to_vev_u8);
+    let value = usize_to_vec_u8(arg.value);
+    stream.append(&value);
 
-    let data = arg.data;
-    let data_to_vev_u8 = string_to_vev_u8(&data[2..]);
-    stream.append(&data_to_vev_u8);
+    let data = string_to_vec_u8(&arg.data[2..]);
+    stream.append(&data);
 
     stream.append_raw(&[0xc0], 1);
 
-    stream.append_empty_data();
-    stream.append_empty_data();
-    stream.append_empty_data();
+    for _i in 0..3 {
+        stream.append_empty_data();
+    }
 
     let result = stream.out().to_vec();
 
@@ -162,51 +144,38 @@ pub fn recover_address(signature: Vec<u8>, recovery_id: u8, message: Vec<u8>) ->
     compute_address(public_key.serialize_compressed().to_vec())
 }
 
-#[cfg(test)]
 pub fn create_raw_tx_1559(arg: EVMTransactionEIP1559) -> Vec<u8> {
     let mut stream = rlp::RlpStream::new_list(12);
 
-    let chain_id = format!("{:02x}", arg.chain_id);
-    let chain_id_vev_u8 = string_to_vev_u8(&chain_id);
-    stream.append(&chain_id_vev_u8);
+    let chain_id = usize_to_vec_u8(arg.chain_id);
+    stream.append(&chain_id);
 
-    if arg.nonce == 0 {
-        stream.append_empty_data();
-    } else {
-        let nonce = format!("{:02x}", arg.nonce);
-        let nonce_to_vev_u8 = string_to_vev_u8(&nonce);
-        stream.append(&nonce_to_vev_u8);
-    }
+    let nonce = usize_to_vec_u8(arg.nonce);
+    stream.append(&nonce);
 
-    let max_priority_fee_per_gas = format!("{:010x}", arg.max_priority_fee_per_gas);
-    let max_priority_fee_per_gas_to_vev_u8 = string_to_vev_u8(&max_priority_fee_per_gas);
-    stream.append(&max_priority_fee_per_gas_to_vev_u8);
+    let max_priority_fee_per_gas = usize_to_vec_u8(arg.max_priority_fee_per_gas);
+    stream.append(&max_priority_fee_per_gas);
 
-    let max_fee_per_gas = format!("{:010x}", arg.max_fee_per_gas);
-    let max_fee_per_gas_to_vev_u8 = string_to_vev_u8(&max_fee_per_gas);
-    stream.append(&max_fee_per_gas_to_vev_u8);
+    let max_fee_per_gas = usize_to_vec_u8(arg.max_fee_per_gas);
+    stream.append(&max_fee_per_gas);
 
-    let gas_limit = format!("{:02x}", arg.gas_limit);
-    let gas_limit_to_vev_u8 = string_to_vev_u8(&gas_limit);
-    stream.append(&gas_limit_to_vev_u8);
+    let gas_limit = usize_to_vec_u8(arg.gas_limit);
+    stream.append(&gas_limit);
 
-    let to = arg.to;
-    let to_to_vev_u8 = string_to_vev_u8(&to[2..]);
-    stream.append(&to_to_vev_u8);
+    let to = string_to_vec_u8(&arg.to[2..]);
+    stream.append(&to);
 
-    let value = format!("{:020x}", arg.value);
-    let value_to_vev_u8 = string_to_vev_u8(&value);
-    stream.append(&value_to_vev_u8);
+    let value = usize_to_vec_u8(arg.value);
+    stream.append(&value);
 
-    let data = arg.data;
-    let data_to_vev_u8 = string_to_vev_u8(&data[2..]);
-    stream.append(&data_to_vev_u8);
+    let data = string_to_vec_u8(&arg.data[2..]);
+    stream.append(&data);
 
     stream.append_raw(&[0xc0], 1);
 
-    stream.append_empty_data();
-    stream.append_empty_data();
-    stream.append_empty_data();
+    for _i in 0..3 {
+        stream.append_empty_data();
+    }
 
     let result = stream.out().to_vec();
 
