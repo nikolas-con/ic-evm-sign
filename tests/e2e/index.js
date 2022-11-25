@@ -172,4 +172,96 @@ describe("Sign EVM Transactions", function () {
 
     assert.ok(user2After.sub(user2Before).eq(ethers.utils.parseEther(value)));
   });
+  it("Deploy and used a contract", async function () {
+    const [owner, user2] = await ethers.getSigners();
+    let address;
+    try {
+      const res = await actor.create();
+      address = res.Ok.address;
+    } catch (error) {
+      const res = await actor.get_caller_data();
+      address = res.Ok.address;
+    }
+
+    await owner.sendTransaction({
+      to: address,
+      value: ethers.utils.parseEther("10"),
+    });
+
+    const contract = await ethers.getContractFactory("Example");
+
+    const estimatedGasDeploy = await ethers.provider.estimateGas({
+      data: contract.getDeployTransaction().data,
+    });
+
+    const data = contract.bytecode;
+
+    const { maxFeePerGas, maxPriorityFeePerGas } =
+      await ethers.provider.getFeeData();
+
+    const txDataDeployContract = {
+      data,
+      gasLimit: estimatedGasDeploy.toHexString(),
+      maxPriorityFeePerGas: maxPriorityFeePerGas.toHexString(),
+      maxFeePerGas: maxFeePerGas.toHexString(),
+      nonce: await ethers.provider.getTransactionCount(address),
+      to: null,
+      value: "0x00",
+      chainId: "0x01",
+      accessList: [],
+      type: "0x02",
+    };
+
+    const deployContractTx = createRawTx1559(txDataDeployContract);
+
+    const deployContractSignedTx = await signTx(deployContractTx, actor);
+
+    const { hash } = await ethers.provider.sendTransaction(
+      deployContractSignedTx
+    );
+
+    const receiptDeployContractTx = await ethers.provider.waitForTransaction(
+      hash
+    );
+
+    const deployedContract = contract.attach(
+      receiptDeployContractTx.contractAddress
+    );
+
+    const nameBefore = await deployedContract.name();
+    console.log(nameBefore);
+
+    assert.ok(nameBefore === "foo");
+
+    const ABI = ["function setName(string memory _name)"];
+    const iface = new ethers.utils.Interface(ABI);
+
+    const setNameEncoded = iface.encodeFunctionData("setName", ["bar"]);
+    const gasLimit = await deployedContract.estimateGas.setName("bar");
+
+    const txData = {
+      data: setNameEncoded,
+      gasLimit: gasLimit.toHexString(),
+      maxPriorityFeePerGas: maxPriorityFeePerGas.toHexString(),
+      maxFeePerGas: maxFeePerGas.toHexString(),
+      nonce: await ethers.provider.getTransactionCount(address),
+      to: deployedContract.address,
+      value: "0x00",
+      chainId: "0x01",
+      accessList: [],
+      type: "0x02",
+    };
+
+    const tx = createRawTx1559(txData);
+
+    const signedTx = await signTx(tx, actor);
+
+    const { hash: hash2 } = await ethers.provider.sendTransaction(signedTx);
+
+    await ethers.provider.waitForTransaction(hash2);
+
+    const nameAfter = await deployedContract.name();
+    console.log(nameAfter);
+    assert.ok(nameAfter === "bar");
+  });
 });
