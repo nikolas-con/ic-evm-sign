@@ -98,7 +98,7 @@ pub async fn create(principal_id: Principal) -> Result<CreateResponse, String> {
 
 pub async fn sign(
     hex_raw_tx: Vec<u8>,
-    chain_id: usize,
+    chain_id: u64,
     principal_id: Principal,
 ) -> Result<SignResponse, String> {
     let users = STATE.with(|s| s.borrow().users.clone());
@@ -138,7 +138,9 @@ pub async fn sign(
 
     let rec_id = get_rec_id(&message, &res.signature, &user.public_key).unwrap();
 
-    let signed_tx = tx.signed(res.signature.clone(), rec_id).unwrap();
+    let signed_tx = tx
+        .sign(res.signature.clone(), u64::try_from(rec_id).unwrap())
+        .unwrap();
 
     STATE.with(|s| {
         let mut state = s.borrow_mut();
