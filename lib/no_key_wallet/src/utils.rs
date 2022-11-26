@@ -78,33 +78,6 @@ pub fn generate_random_private_key() -> libsecp256k1::SecretKey {
         }
     }
 }
-// pub fn create_raw_legacy_tx(arg: EVMTransactionLegacy) -> Vec<u8> {
-//     let mut stream = rlp::RlpStream::new_list(9);
-
-//     let nonce = usize_to_vec_u8(arg.nonce);
-//     stream.append(&nonce);
-
-//     let gas_price = usize_to_vec_u8(arg.gas_price);
-//     stream.append(&gas_price);
-
-//     let gas_limit = usize_to_vec_u8(arg.gas_limit);
-//     stream.append(&gas_limit);
-
-//     let to = string_to_vec_u8(&arg.to[2..]);
-//     stream.append(&to);
-
-//     let value = usize_to_vec_u8(arg.value);
-//     stream.append(&value);
-
-//     let data = string_to_vec_u8(&arg.data[2..]);
-//     stream.append(&data);
-
-//     for _i in 0..3 {
-//         stream.append_empty_data();
-//     }
-
-//     stream.out().to_vec()
-// }
 
 // pub fn create_raw_eip_2930_tx(arg: EVMTransactionEIP2930) -> Vec<u8> {
 //     let mut stream = rlp::RlpStream::new_list(11);
