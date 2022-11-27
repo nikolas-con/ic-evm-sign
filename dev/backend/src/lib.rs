@@ -11,6 +11,11 @@ struct CreateResponse {
 struct SignatureInfo {
     sign_tx: Vec<u8>,
 }
+
+#[derive(Debug, CandidType)]
+struct DeployEVMContractResponse {
+    tx: Vec<u8>,
+}
 #[derive(Debug, CandidType)]
 struct CallerTransactionsResponse {
     transactions: Vec<Transaction>,
@@ -46,6 +51,58 @@ async fn sign_evm_tx(hex_raw_tx: Vec<u8>, chain_id: u64) -> Result<SignatureInfo
     Ok(SignatureInfo {
         sign_tx: res.sign_tx,
     })
+}
+
+#[update]
+async fn deploy_evm_contract(
+    bytecode: Vec<u8>,
+    chain_id: u64,
+    max_priority_fee_per_gas: u64,
+    gas_limit: u64,
+    max_fee_per_gas: u64,
+) -> Result<DeployEVMContractResponse, String> {
+    let principal_id = ic_cdk::caller();
+    let res = no_key_wallet::deploy_contract(
+        principal_id,
+        bytecode,
+        chain_id,
+        max_priority_fee_per_gas,
+        gas_limit,
+        max_fee_per_gas,
+    )
+    .await
+    .map_err(|e| format!("Failed to call sign_with_ecdsa {}", e))
+    .unwrap();
+
+    Ok(DeployEVMContractResponse { tx: res.tx })
+}
+
+#[update]
+async fn transfer_erc_20(
+    chain_id: u64,
+    max_priority_fee_per_gas: u64,
+    gas_limit: u64,
+    max_fee_per_gas: u64,
+    address: String,
+    value: u64,
+    contract_address: String,
+) -> Result<DeployEVMContractResponse, String> {
+    let principal_id = ic_cdk::caller();
+    let res = no_key_wallet::transfer_erc_20(
+        principal_id,
+        chain_id,
+        max_priority_fee_per_gas,
+        gas_limit,
+        max_fee_per_gas,
+        address,
+        value,
+        contract_address,
+    )
+    .await
+    .map_err(|e| format!("Failed to call sign_with_ecdsa {}", e))
+    .unwrap();
+
+    Ok(DeployEVMContractResponse { tx: res.tx })
 }
 
 #[update]

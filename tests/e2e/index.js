@@ -39,6 +39,7 @@ describe("Sign EVM Transactions", function () {
     actor = Actor.createActor(idlFactory, createActorOptions);
 
     const res = await actor.create();
+    // const res = await actor.get_caller_data();
 
     const address = res.Ok.address;
     const [owner, user] = await ethers.getSigners();
@@ -181,6 +182,68 @@ describe("Sign EVM Transactions", function () {
     assert.ok(
       otherUserAfter.sub(otherUserBefore).eq(ethers.utils.parseEther(value))
     );
+  });
+  it.only("Deploy and used a contract hil", async function () {
+    const res = await actor.get_caller_data();
+    const address = res.Ok.address;
+
+    const contract = await ethers.getContractFactory("ExampleToken");
+
+    const estimatedGasDeploy = await ethers.provider.estimateGas({
+      data: contract.getDeployTransaction().data,
+    });
+
+    const bytecode = Buffer.from(contract.bytecode.substring(2), "hex");
+
+    const { maxFeePerGas, maxPriorityFeePerGas } =
+      await ethers.provider.getFeeData();
+
+    const chainId = await ethers.provider.getNetwork().then((v) => v.chainId);
+    maxFeePerGas.toNumber();
+
+    const res1 = await actor.deploy_evm_contract(
+      [...bytecode],
+      chainId,
+      maxPriorityFeePerGas.toNumber(),
+      estimatedGasDeploy.toNumber(),
+      maxFeePerGas.toNumber()
+    );
+
+    const tx = "0x" + Buffer.from(res1.Ok.tx, "hex").toString("hex");
+
+    const { hash } = await ethers.provider.sendTransaction(tx);
+
+    const receiptDeployContract = await ethers.provider.waitForTransaction(
+      hash
+    );
+
+    const contractAddress = receiptDeployContract.contractAddress;
+
+    const deployedContract = contract.attach(contractAddress);
+
+    const balance = await deployedContract.balanceOf(address);
+    assert.ok(balance.eq(ethers.utils.parseUnits("100000", 18)));
+
+    const addressOtherUser = await otherUser.getAddress();
+    const res2 = await actor.transfer_erc_20(
+      chainId,
+      maxPriorityFeePerGas.toNumber(),
+      estimatedGasDeploy.toNumber(),
+      maxFeePerGas.toNumber(),
+      addressOtherUser,
+      1000000000000000000,
+      contractAddress
+    );
+
+    const tx2 = "0x" + Buffer.from(res2.Ok.tx, "hex").toString("hex");
+
+    const { hash: hash2 } = await ethers.provider.sendTransaction(tx2);
+
+    await ethers.provider.waitForTransaction(hash2);
+
+    const balanceOtherUser = await deployedContract.balanceOf(addressOtherUser);
+
+    assert.ok(balanceOtherUser.eq(ethers.utils.parseUnits("1", 18)));
   });
   it("Deploy and used a contract", async function () {
     const res = await actor.get_caller_data();

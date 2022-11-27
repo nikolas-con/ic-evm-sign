@@ -18,6 +18,19 @@ pub fn compute_address(public_key: Vec<u8>) -> String {
     address
 }
 
+pub fn get_transfer_data(address: &str, value: u64) -> String {
+    let method_sig = "transfer(address,uint256)";
+    let keccak256 = easy_hasher::raw_keccak256(method_sig.as_bytes().to_vec());
+    let method_id = &keccak256.to_hex_string()[..8];
+
+    let address_64 = format!("{:0>64}", &address[2..]);
+
+    let value_hex = format!("{:02x}", value);
+    let value_64 = format!("{:0>64}", value_hex);
+
+    method_id.to_owned() + &address_64 + &value_64
+}
+
 pub fn get_rec_id(
     message: &Vec<u8>,
     signature: &Vec<u8>,

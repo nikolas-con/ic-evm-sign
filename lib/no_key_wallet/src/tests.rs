@@ -1,5 +1,5 @@
 use super::*;
-use crate::transaction::{Sign, Transaction1559};
+use crate::transaction::Sign;
 use crate::utils::recover_address;
 use ic_cdk::export::Principal;
 

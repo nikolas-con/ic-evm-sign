@@ -371,7 +371,7 @@ impl Sign for Transaction2930 {
 
         let access_list = rlp::encode_list(&self.access_list[..]);
 
-        stream.append_list(&access_list);
+        stream.append_raw(&access_list, 1);
 
         let v = string_to_vec_u8(&self.v[2..]);
         stream.append(&v);
@@ -580,7 +580,7 @@ impl Sign for Transaction1559 {
 
         let access_list = rlp::encode_list(&self.access_list[..]);
 
-        stream.append_list(&access_list);
+        stream.append_raw(&access_list, 1);
 
         let v = string_to_vec_u8(&self.v[2..]);
         stream.append(&v);
