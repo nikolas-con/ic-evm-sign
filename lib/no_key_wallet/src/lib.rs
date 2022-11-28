@@ -106,7 +106,7 @@ pub async fn sign(
     } else {
         return Err("this user does not exist".to_string());
     }
-    let tx = transaction::get_transaction(&hex_raw_tx, chain_id.clone()).unwrap();
+    let mut tx = transaction::get_transaction(&hex_raw_tx, chain_id.clone()).unwrap();
 
     let message = tx.get_message_to_sign().unwrap();
 

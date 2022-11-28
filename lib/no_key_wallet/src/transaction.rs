@@ -9,7 +9,7 @@ enum TransactionType {
 
 pub trait Sign {
     fn get_message_to_sign(&self) -> Result<Vec<u8>, String>;
-    fn sign(&self, signature: Vec<u8>, rec_id: u64) -> Result<Vec<u8>, String>;
+    fn sign(&mut self, signature: Vec<u8>, rec_id: u64) -> Result<Vec<u8>, String>;
     fn is_signed(&self) -> bool;
     fn get_signature(&self) -> Result<Vec<u8>, String>;
     fn get_recovery_id(&self) -> Result<u8, String>;
@@ -78,7 +78,6 @@ impl From<Vec<u8>> for TransactionLegacy {
     }
 }
 impl Sign for TransactionLegacy {
-    // (nonce, gasprice, startgas, to, value, data, chainid, 0, 0)
     fn get_message_to_sign(&self) -> Result<Vec<u8>, String> {
         let mut stream = rlp::RlpStream::new_list(9);
 
@@ -105,33 +104,22 @@ impl Sign for TransactionLegacy {
 
         Ok(keccak256.to_vec())
     }
-    fn sign(&self, signature: Vec<u8>, rec_id: u64) -> Result<Vec<u8>, String> {
+    fn sign(&mut self, signature: Vec<u8>, rec_id: u64) -> Result<Vec<u8>, String> {
         let chain_id = u8::try_from(self.chain_id).unwrap();
 
-        let r = &signature[..32];
-        let s = &signature[32..];
-        let v = vec![u8::try_from(chain_id * 2 + 35 + u8::try_from(rec_id).unwrap()).unwrap()];
+        let r = vec_u8_to_string(&signature[..32].to_vec());
+        let s = vec_u8_to_string(&signature[32..].to_vec());
+        let v = vec_u8_to_string(&vec![u8::try_from(
+            chain_id * 2 + 35 + u8::try_from(rec_id).unwrap(),
+        )
+        .unwrap()]);
 
-        let items = [
-            u64_to_vec_u8(&self.nonce),
-            u64_to_vec_u8(&self.gas_price),
-            u64_to_vec_u8(&self.gas_limit),
-            string_to_vec_u8(&self.to),
-            u64_to_vec_u8(&self.value),
-            string_to_vec_u8(&self.data),
-        ];
+        self.v = "0x".to_owned() + &v;
+        self.r = "0x".to_owned() + &r;
+        self.s = "0x".to_owned() + &s;
 
-        let mut stream = rlp::RlpStream::new_list(9);
-
-        for item in items {
-            stream.append(&item);
-        }
-
-        stream.append(&v);
-        stream.append(&r.to_vec());
-        stream.append(&s.to_vec());
-
-        Ok(stream.out())
+        let result = self.serialize().unwrap();
+        Ok(result)
     }
     fn is_signed(&self) -> bool {
         let r = string_to_vec_u8(&self.r);
@@ -155,6 +143,7 @@ impl Sign for TransactionLegacy {
         }
         let chain_id = i8::try_from(self.chain_id).unwrap();
         let v = string_to_vec_u8(&self.v);
+
         let recovery_id = -1 * ((chain_id * 2) + 35 - i8::try_from(v[0]).unwrap());
         Ok(u8::try_from(recovery_id).unwrap())
     }
@@ -170,22 +159,47 @@ impl Sign for TransactionLegacy {
         let gas_limit = u64_to_vec_u8(&self.gas_limit);
         stream.append(&gas_limit);
 
-        let to = string_to_vec_u8(&&self.to[2..]);
+        let to: Vec<u8>;
+        if self.to.starts_with("0x") {
+            to = string_to_vec_u8(&self.to[2..]);
+        } else {
+            to = string_to_vec_u8(&self.to[..]);
+        }
         stream.append(&to);
 
         let value = u64_to_vec_u8(&self.value);
         stream.append(&value);
 
-        let data = string_to_vec_u8(&self.data[2..]);
+        let data: Vec<u8>;
+        if self.data.starts_with("0x") {
+            data = string_to_vec_u8(&self.data[2..]);
+        } else {
+            data = string_to_vec_u8(&self.data[..]);
+        }
         stream.append(&data);
 
-        let v = string_to_vec_u8(&self.v[2..]);
+        let v: Vec<u8>;
+        if self.v.starts_with("0x") {
+            v = string_to_vec_u8(&self.v[2..]);
+        } else {
+            v = string_to_vec_u8(&self.v[..]);
+        }
         stream.append(&v);
 
-        let r = string_to_vec_u8(&self.r[2..]);
+        let r: Vec<u8>;
+        if self.r.starts_with("0x") {
+            r = string_to_vec_u8(&self.r[2..]);
+        } else {
+            r = string_to_vec_u8(&self.r[..]);
+        }
         stream.append(&r);
 
-        let s = string_to_vec_u8(&self.s[2..]);
+        let s: Vec<u8>;
+        if self.s.starts_with("0x") {
+            s = string_to_vec_u8(&self.s[2..]);
+        } else {
+            s = string_to_vec_u8(&self.s[..]);
+        }
         stream.append(&s);
 
         Ok(stream.out().to_vec())
@@ -207,7 +221,7 @@ pub struct Transaction2930 {
     pub r: String,
     pub s: String,
 }
-// 0x01 || rlp([chainId, nonce, gasPrice, gasLimit, to, value, data, accessList, signatureYParity, signatureR, signatureS]).
+
 impl From<Vec<u8>> for Transaction2930 {
     fn from(data: Vec<u8>) -> Self {
         let rlp = rlp::Rlp::new(&data[1..]);
@@ -258,6 +272,7 @@ impl From<Vec<u8>> for Transaction2930 {
         }
     }
 }
+
 impl Sign for Transaction2930 {
     fn get_message_to_sign(&self) -> Result<Vec<u8>, String> {
         let mut stream = rlp::RlpStream::new_list(8);
@@ -284,42 +299,23 @@ impl Sign for Transaction2930 {
         let keccak256 = easy_hasher::raw_keccak256(msg);
         Ok(keccak256.to_vec())
     }
-    fn sign(&self, signature: Vec<u8>, rec_id: u64) -> Result<Vec<u8>, String> {
-        let r = &signature[..32];
-        let s = &signature[32..];
-        let mut stream = rlp::RlpStream::new_list(11);
-
-        let items = [
-            u64_to_vec_u8(&self.chain_id),
-            u64_to_vec_u8(&self.nonce),
-            u64_to_vec_u8(&self.gas_price),
-            u64_to_vec_u8(&self.gas_limit),
-            string_to_vec_u8(&self.to),
-            u64_to_vec_u8(&self.value),
-            string_to_vec_u8(&self.data),
-        ];
-
-        for item in items {
-            stream.append(&item);
-        }
-
-        stream.append_raw(&self.access_list, 1);
-
+    fn sign(&mut self, signature: Vec<u8>, rec_id: u64) -> Result<Vec<u8>, String> {
+        let r = vec_u8_to_string(&signature[..32].to_vec());
+        let s = vec_u8_to_string(&signature[32..].to_vec());
+        let v: String;
         if rec_id == 0 {
-            stream.append_empty_data();
+            v = "".to_string();
         } else {
-            let v = vec![0x01];
-            stream.append(&v);
+            v = "01".to_string();
         }
 
-        stream.append(&r);
-        stream.append(&s);
+        self.v = v;
+        self.r = r;
+        self.s = s;
 
-        let result = stream.out();
-
-        Ok([&[0x01], &result[..]].concat())
+        let result = self.serialize().unwrap();
+        Ok(result)
     }
-
     fn is_signed(&self) -> bool {
         let r = string_to_vec_u8(&self.r);
         let s = string_to_vec_u8(&self.s);
@@ -364,26 +360,50 @@ impl Sign for Transaction2930 {
         let gas_limit = u64_to_vec_u8(&self.gas_limit);
         stream.append(&gas_limit);
 
-        let to = string_to_vec_u8(&self.to[2..]);
+        let to: Vec<u8>;
+        if self.to.starts_with("0x") {
+            to = string_to_vec_u8(&self.to[2..]);
+        } else {
+            to = string_to_vec_u8(&self.to[..]);
+        }
         stream.append(&to);
 
         let value = u64_to_vec_u8(&self.value);
         stream.append(&value);
 
-        let data = string_to_vec_u8(&self.data[2..]);
+        let data: Vec<u8>;
+        if self.data.starts_with("0x") {
+            data = string_to_vec_u8(&self.data[2..]);
+        } else {
+            data = string_to_vec_u8(&self.data[..]);
+        }
         stream.append(&data);
 
-        let access_list = rlp::encode_list(&self.access_list[..]);
+        let access_list = rlp::encode_list(&self.access_list);
+        stream.append_raw(&[0xc0], 1);
 
-        stream.append_raw(&access_list, 1);
-
-        let v = string_to_vec_u8(&self.v[2..]);
+        let v: Vec<u8>;
+        if self.data.starts_with("0x") {
+            v = string_to_vec_u8(&self.v[2..]);
+        } else {
+            v = string_to_vec_u8(&self.v[..]);
+        }
         stream.append(&v);
 
-        let r = string_to_vec_u8(&self.r[2..]);
+        let r: Vec<u8>;
+        if self.data.starts_with("0x") {
+            r = string_to_vec_u8(&self.r[2..]);
+        } else {
+            r = string_to_vec_u8(&self.r[..]);
+        }
         stream.append(&r);
 
-        let s = string_to_vec_u8(&self.s[2..]);
+        let s: Vec<u8>;
+        if self.data.starts_with("0x") {
+            s = string_to_vec_u8(&self.s[2..]);
+        } else {
+            s = string_to_vec_u8(&self.s[..]);
+        }
         stream.append(&s);
 
         let result = stream.out().to_vec();
@@ -496,42 +516,22 @@ impl Sign for Transaction1559 {
         Ok(keccak256.to_vec())
     }
 
-    fn sign(&self, signature: Vec<u8>, rec_id: u64) -> Result<Vec<u8>, String> {
-        let r = &signature[..32];
-        let s = &signature[32..];
-        let mut stream = rlp::RlpStream::new_list(12);
+    fn sign(&mut self, signature: Vec<u8>, rec_id: u64) -> Result<Vec<u8>, String> {
+        let r = vec_u8_to_string(&signature[..32].to_vec());
+        let s = vec_u8_to_string(&signature[32..].to_vec());
 
-        let selfs = [
-            u64_to_vec_u8(&self.chain_id),
-            u64_to_vec_u8(&self.nonce),
-            u64_to_vec_u8(&self.max_priority_fee_per_gas),
-            u64_to_vec_u8(&self.max_fee_per_gas),
-            u64_to_vec_u8(&self.gas_limit),
-            string_to_vec_u8(&self.to),
-            u64_to_vec_u8(&self.value),
-            string_to_vec_u8(&self.data),
-        ];
-
-        for i in 0..=7 {
-            let item = &selfs[i];
-            stream.append(item);
-        }
-
-        stream.append_raw(&self.access_list, 1);
-
+        let v: String;
         if rec_id == 0 {
-            stream.append_empty_data();
+            v = "".to_string();
         } else {
-            let v = vec![0x01];
-            stream.append(&v);
+            v = "01".to_string();
         }
-        stream.append(&r);
+        self.v = v;
+        self.r = r;
+        self.s = s;
 
-        stream.append(&s);
-
-        let result = stream.out();
-
-        Ok([&[0x02], &result[..]].concat())
+        let result = self.serialize().unwrap();
+        Ok(result)
     }
     fn is_signed(&self) -> bool {
         !self.r.is_empty() || !self.r.is_empty()
@@ -576,26 +576,51 @@ impl Sign for Transaction1559 {
         let gas_limit = u64_to_vec_u8(&self.gas_limit);
         stream.append(&gas_limit);
 
-        let to = string_to_vec_u8(&self.to[2..]);
+        let to: Vec<u8>;
+        if self.to.starts_with("0x") {
+            to = string_to_vec_u8(&self.to[2..]);
+        } else {
+            to = string_to_vec_u8(&self.to[..]);
+        }
         stream.append(&to);
 
         let value = u64_to_vec_u8(&self.value);
         stream.append(&value);
 
-        let data = string_to_vec_u8(&self.data[2..]);
+        let data: Vec<u8>;
+        if self.to.starts_with("0x") {
+            data = string_to_vec_u8(&self.data[2..]);
+        } else {
+            data = string_to_vec_u8(&self.data[..]);
+        }
         stream.append(&data);
 
         let access_list = rlp::encode_list(&self.access_list[..]);
 
-        stream.append_raw(&access_list, 1);
+        stream.append_raw(&[0xc0], 1);
 
-        let v = string_to_vec_u8(&self.v[2..]);
+        let v: Vec<u8>;
+        if self.to.starts_with("0x") {
+            v = string_to_vec_u8(&self.v[2..]);
+        } else {
+            v = string_to_vec_u8(&self.v[..]);
+        }
         stream.append(&v);
 
-        let r = string_to_vec_u8(&self.r[2..]);
+        let r: Vec<u8>;
+        if self.to.starts_with("0x") {
+            r = string_to_vec_u8(&self.r[2..]);
+        } else {
+            r = string_to_vec_u8(&self.r[..]);
+        }
         stream.append(&r);
 
-        let s = string_to_vec_u8(&self.s[2..]);
+        let s: Vec<u8>;
+        if self.to.starts_with("0x") {
+            s = string_to_vec_u8(&self.s[2..]);
+        } else {
+            s = string_to_vec_u8(&self.s[..]);
+        }
         stream.append(&s);
 
         let result = stream.out().to_vec();
