@@ -122,10 +122,20 @@ impl Sign for TransactionLegacy {
         Ok(result)
     }
     fn is_signed(&self) -> bool {
-        let r = string_to_vec_u8(&self.r);
-        let s = string_to_vec_u8(&self.s);
+        let r: String;
+        if self.r.starts_with("0x") {
+            r = self.r[2..].to_string();
+        } else {
+            r = self.r[..].to_string();
+        }
+        let s: String;
+        if self.s.starts_with("0x") {
+            s = self.s[2..].to_string();
+        } else {
+            s = self.s[..].to_string();
+        }
 
-        !r.is_empty() && !s.is_empty()
+        r != "00" || s != "00"
     }
     fn get_signature(&self) -> Result<Vec<u8>, String> {
         if !self.is_signed() {
@@ -317,10 +327,20 @@ impl Sign for Transaction2930 {
         Ok(result)
     }
     fn is_signed(&self) -> bool {
-        let r = string_to_vec_u8(&self.r);
-        let s = string_to_vec_u8(&self.s);
+        let r: String;
+        if self.r.starts_with("0x") {
+            r = self.r[2..].to_string();
+        } else {
+            r = self.r[..].to_string();
+        }
+        let s: String;
+        if self.s.starts_with("0x") {
+            s = self.s[2..].to_string();
+        } else {
+            s = self.s[..].to_string();
+        }
 
-        !r.is_empty() && !s.is_empty()
+        r != "00" || s != "00"
     }
     fn get_signature(&self) -> Result<Vec<u8>, String> {
         if !self.is_signed() {
@@ -379,8 +399,7 @@ impl Sign for Transaction2930 {
         }
         stream.append(&data);
 
-        let access_list = rlp::encode_list(&self.access_list);
-        stream.append_raw(&[0xc0], 1);
+        stream.append_raw(&&self.access_list[..], 1);
 
         let v: Vec<u8>;
         if self.data.starts_with("0x") {
@@ -534,7 +553,20 @@ impl Sign for Transaction1559 {
         Ok(result)
     }
     fn is_signed(&self) -> bool {
-        !self.r.is_empty() || !self.r.is_empty()
+        let r: String;
+        if self.r.starts_with("0x") {
+            r = self.r[2..].to_string();
+        } else {
+            r = self.r[..].to_string();
+        }
+        let s: String;
+        if self.s.starts_with("0x") {
+            s = self.s[2..].to_string();
+        } else {
+            s = self.s[..].to_string();
+        }
+
+        r != "00" || s != "00"
     }
     fn get_signature(&self) -> Result<Vec<u8>, String> {
         if !self.is_signed() {
@@ -595,9 +627,7 @@ impl Sign for Transaction1559 {
         }
         stream.append(&data);
 
-        let access_list = rlp::encode_list(&self.access_list[..]);
-
-        stream.append_raw(&[0xc0], 1);
+        stream.append_raw(&self.access_list, 1);
 
         let v: Vec<u8>;
         if self.to.starts_with("0x") {

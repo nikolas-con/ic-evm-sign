@@ -82,17 +82,6 @@ pub fn vec_u8_to_u64(vec: &Vec<u8>) -> u64 {
 }
 
 #[cfg(test)]
-pub fn generate_random_private_key() -> libsecp256k1::SecretKey {
-    loop {
-        let mut ret = [0u8; 32];
-        getrandom::getrandom(&mut ret).unwrap();
-        if let Ok(key) = libsecp256k1::SecretKey::parse(&ret) {
-            return key;
-        }
-    }
-}
-
-#[cfg(test)]
 pub fn recover_address(signature: Vec<u8>, recovery_id: u8, message: Vec<u8>) -> String {
     let signature_bytes: [u8; 64] = signature[..].try_into().unwrap();
     let signature_bytes_64 = libsecp256k1::Signature::parse_standard(&signature_bytes).unwrap();

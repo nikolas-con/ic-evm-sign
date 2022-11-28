@@ -99,7 +99,6 @@ describe("Sign EVM Transactions", function () {
     const res = await actor.get_caller_data(chainId);
 
     const nonce = Number(res.Ok.transactions.nonce);
-    console.log(nonce);
     const { maxFeePerGas, maxPriorityFeePerGas } =
       await ethers.provider.getFeeData();
     const gasLimit = ethers.BigNumber.from("23000").toHexString();
@@ -144,7 +143,6 @@ describe("Sign EVM Transactions", function () {
     const res = await actor.get_caller_data(chainId);
 
     const nonce = Number(res.Ok.transactions.nonce);
-    console.log(nonce);
     const { maxPriorityFeePerGas, gasPrice } =
       await ethers.provider.getFeeData();
     const gasLimit = ethers.BigNumber.from("23000").toHexString();
