@@ -13,6 +13,7 @@ pub trait Sign {
     fn is_signed(&self) -> bool;
     fn get_signature(&self) -> Result<Vec<u8>, String>;
     fn get_recovery_id(&self) -> Result<u8, String>;
+    fn get_nonce(&self) -> Result<u64, String>;
     fn serialize(&self) -> Result<Vec<u8>, String>;
 }
 
@@ -188,6 +189,9 @@ impl Sign for TransactionLegacy {
         stream.append(&s);
 
         Ok(stream.out().to_vec())
+    }
+    fn get_nonce(&self) -> Result<u64, String> {
+        Ok(self.nonce)
     }
 }
 pub struct Transaction2930 {
@@ -385,6 +389,9 @@ impl Sign for Transaction2930 {
         let result = stream.out().to_vec();
 
         Ok([&[0x01], &result[..]].concat())
+    }
+    fn get_nonce(&self) -> Result<u64, String> {
+        Ok(self.nonce)
     }
 }
 #[derive(Debug, Clone)]
@@ -594,6 +601,9 @@ impl Sign for Transaction1559 {
         let result = stream.out().to_vec();
 
         Ok([&[0x02], &result[..]].concat())
+    }
+    fn get_nonce(&self) -> Result<u64, String> {
+        Ok(self.nonce)
     }
 }
 

@@ -25,9 +25,6 @@ use state::*;
 mod transaction;
 use transaction::*;
 
-use std::cell::RefCell;
-use std::collections::HashMap;
-
 #[derive(CandidType, Serialize, Debug)]
 pub struct CreateResponse {
     pub address: String,
@@ -51,16 +48,7 @@ pub struct CallerTransactionsResponse {
 #[derive(CandidType, Deserialize, Debug)]
 pub struct CallerResponse {
     pub address: String,
-    pub transactions: Vec<Transaction>,
-}
-
-#[derive(Default, CandidType, Deserialize, Debug)]
-struct State {
-    users: HashMap<Principal, User>,
-}
-
-thread_local! {
-    static STATE: RefCell<State> = RefCell::new(State::default());
+    pub transactions: ChainData,
 }
 
 pub async fn create(principal_id: Principal) -> Result<CreateResponse, String> {
@@ -118,7 +106,7 @@ pub async fn sign(
     } else {
         return Err("this user does not exist".to_string());
     }
-    let tx = transaction::get_transaction(&hex_raw_tx, chain_id).unwrap();
+    let tx = transaction::get_transaction(&hex_raw_tx, chain_id.clone()).unwrap();
 
     let message = tx.get_message_to_sign().unwrap();
 
@@ -154,10 +142,21 @@ pub async fn sign(
     STATE.with(|s| {
         let mut state = s.borrow_mut();
         let user = state.users.get_mut(&principal_id).unwrap();
-        let mut tx = Transaction::default();
-        tx.data = signed_tx.clone();
-        tx.timestamp = ic_timestamp();
-        user.transactions.push(tx);
+
+        let mut transaction = Transaction::default();
+        transaction.data = signed_tx.clone();
+        transaction.timestamp = ic_timestamp();
+
+        if let Some(user_tx) = user.transactions.get_mut(&chain_id) {
+            user_tx.transactions.push(transaction);
+            user_tx.nonce = tx.get_nonce().unwrap() + 1;
+        } else {
+            let mut chain_data = ChainData::default();
+            chain_data.nonce = tx.get_nonce().unwrap() + 1;
+            chain_data.transactions.push(transaction);
+
+            user.transactions.insert(chain_id, chain_data);
+        }
     });
 
     Ok(SignResponse { sign_tx: signed_tx })
@@ -179,7 +178,13 @@ pub async fn deploy_contract(
     } else {
         return Err("this user does not exist".to_string());
     }
-    let nonce = u64::try_from(user.transactions.len()).unwrap();
+
+    let nonce: u64;
+    if let Some(user_transactions) = user.transactions.get(&chain_id) {
+        nonce = user_transactions.nonce;
+    } else {
+        nonce = 0;
+    }
     let data = "0x".to_owned() + &utils::vec_u8_to_string(&bytecode);
     let tx = transaction::Transaction1559 {
         nonce,
@@ -220,7 +225,13 @@ pub async fn transfer_erc_20(
     } else {
         return Err("this user does not exist".to_string());
     }
-    let nonce = u64::try_from(user.transactions.len()).unwrap();
+
+    let nonce: u64;
+    if let Some(user_transactions) = user.transactions.get(&chain_id) {
+        nonce = user_transactions.nonce;
+    } else {
+        nonce = 0;
+    }
 
     let data = "0x".to_owned() + &utils::get_transfer_data(&address, value);
 
@@ -246,7 +257,7 @@ pub async fn transfer_erc_20(
     Ok(TransferERC20Response { tx: res.sign_tx })
 }
 
-pub fn get_caller_data(principal_id: Principal) -> Result<CallerResponse, String> {
+pub fn get_caller_data(principal_id: Principal, chain_id: u64) -> Result<CallerResponse, String> {
     let users = STATE.with(|s| s.borrow().users.clone());
     let user;
     if let Some(i) = users.get(&principal_id) {
@@ -257,13 +268,19 @@ pub fn get_caller_data(principal_id: Principal) -> Result<CallerResponse, String
 
     let address = compute_address(user.public_key.clone());
 
+    let chain_data = user
+        .transactions
+        .get(&chain_id)
+        .cloned()
+        .unwrap_or_else(|| ChainData::default());
+
     Ok(CallerResponse {
         address,
-        transactions: user.transactions,
+        transactions: chain_data,
     })
 }
 
-pub fn clear_caller_history(principal_id: Principal) -> Result<(), String> {
+pub fn clear_caller_history(principal_id: Principal, chain_id: u64) -> Result<(), String> {
     let users = STATE.with(|s| s.borrow().users.clone());
 
     if let None = users.get(&principal_id) {
@@ -273,7 +290,8 @@ pub fn clear_caller_history(principal_id: Principal) -> Result<(), String> {
     STATE.with(|s| {
         let mut state = s.borrow_mut();
         let user = state.users.get_mut(&principal_id).unwrap();
-        user.transactions.clear();
+        let user_tx = user.transactions.get_mut(&chain_id).unwrap();
+        user_tx.transactions.clear();
     });
 
     Ok(())

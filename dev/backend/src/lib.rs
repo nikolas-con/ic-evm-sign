@@ -1,7 +1,7 @@
 use ic_cdk::export::candid::CandidType;
 use ic_cdk_macros::*;
 use no_key_wallet;
-use no_key_wallet::state::Transaction;
+use no_key_wallet::state::ChainData;
 
 #[derive(Debug, CandidType)]
 struct CreateResponse {
@@ -17,13 +17,9 @@ struct DeployEVMContractResponse {
     tx: Vec<u8>,
 }
 #[derive(Debug, CandidType)]
-struct CallerTransactionsResponse {
-    transactions: Vec<Transaction>,
-}
-#[derive(Debug, CandidType)]
 struct CallerResponse {
     address: String,
-    transactions: Vec<Transaction>,
+    transactions: ChainData,
 }
 
 #[update]
@@ -106,10 +102,10 @@ async fn transfer_erc_20(
 }
 
 #[update]
-fn clear_caller_history() -> Result<(), String> {
+fn clear_caller_history(chain_id: u64) -> Result<(), String> {
     let principal_id = ic_cdk::caller();
 
-    let res = no_key_wallet::clear_caller_history(principal_id)
+    let res = no_key_wallet::clear_caller_history(principal_id, chain_id)
         .map_err(|e| format!("Failed to call clear_caller_history {}", e))
         .unwrap();
 
@@ -117,10 +113,10 @@ fn clear_caller_history() -> Result<(), String> {
 }
 
 #[query]
-fn get_caller_data() -> Result<CallerResponse, String> {
+fn get_caller_data(chain_id: u64) -> Result<CallerResponse, String> {
     let principal_id = ic_cdk::caller();
 
-    let res = no_key_wallet::get_caller_data(principal_id)
+    let res = no_key_wallet::get_caller_data(principal_id, chain_id)
         .map_err(|e| format!("Failed to call get_caller_data {}", e))
         .unwrap();
 
