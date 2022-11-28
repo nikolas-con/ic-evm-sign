@@ -3,6 +3,10 @@ const idleServiceOptions = (IDL) => {
     data: IDL.Vec(IDL.Nat8),
     timestamp: IDL.Nat64,
   });
+  const chainData = IDL.Record({
+    nonce: IDL.Nat64,
+    transactions: IDL.Vec(transactions),
+  });
   const create_response = IDL.Record({
     address: IDL.Text,
   });
@@ -11,7 +15,7 @@ const idleServiceOptions = (IDL) => {
   });
   const caller_response = IDL.Record({
     address: IDL.Text,
-    transactions: IDL.Vec(transactions),
+    transactions: chainData,
   });
 
   const deploy_response = IDL.Record({
@@ -34,7 +38,7 @@ const idleServiceOptions = (IDL) => {
       []
     ),
     get_caller_data: IDL.Func(
-      [],
+      [IDL.Nat64],
       [IDL.Variant({ Ok: caller_response, Err: IDL.Text })],
       ["query"]
     ),
@@ -43,6 +47,7 @@ const idleServiceOptions = (IDL) => {
       [IDL.Variant({ Ok: deploy_response, Err: IDL.Text })],
       ["update"]
     ),
+    clear_caller_history: IDL.Func([IDL.Nat64], [], ["update"]),
     transfer_erc_20: IDL.Func(
       [
         IDL.Nat64,

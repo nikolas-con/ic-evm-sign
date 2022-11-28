@@ -37,11 +37,17 @@ describe("Sign EVM Transactions", function () {
 
     const createActorOptions = { agent, canisterId };
     actor = Actor.createActor(idlFactory, createActorOptions);
+    const { chainId } = await ethers.provider.getNetwork();
+    let address;
+    try {
+      const res = await actor.get_caller_data(chainId);
+      address = res.Ok.address;
+      await actor.clear_caller_history(chainId);
+    } catch {
+      const res = await actor.create();
+      address = res.Ok.address;
+    }
 
-    const res = await actor.create();
-    // const res = await actor.get_caller_data();
-
-    const address = res.Ok.address;
     const [owner, user] = await ethers.getSigners();
 
     otherUser = user;
@@ -53,10 +59,7 @@ describe("Sign EVM Transactions", function () {
   });
 
   it("Sign Legacy Transaction", async function () {
-    const res = await actor.get_caller_data();
-    const address = res.Ok.address;
-
-    const nonce = await ethers.provider.getTransactionCount(address);
+    const nonce = 0;
     const gasPrice = await ethers.provider
       .getGasPrice()
       .then((s) => s.toHexString());
@@ -92,10 +95,11 @@ describe("Sign EVM Transactions", function () {
     );
   });
   it("Sign EIP1559 Transaction", async function () {
-    const res = await actor.get_caller_data();
-    const address = res.Ok.address;
+    const { chainId } = await ethers.provider.getNetwork();
+    const res = await actor.get_caller_data(chainId);
 
-    const nonce = await ethers.provider.getTransactionCount(address);
+    const nonce = Number(res.Ok.transactions.nonce);
+    console.log(nonce);
     const { maxFeePerGas, maxPriorityFeePerGas } =
       await ethers.provider.getFeeData();
     const gasLimit = ethers.BigNumber.from("23000").toHexString();
@@ -103,10 +107,8 @@ describe("Sign EVM Transactions", function () {
     const value = "1";
     const value_hex = ethers.utils.parseEther(value).toHexString();
     const data = ethers.BigNumber.from("0").toHexString();
-    const chainId = await ethers.provider
-      .getNetwork()
-      .then((v) => ethers.BigNumber.from(v.chainId.toString()));
     const type = ethers.BigNumber.from("2").toHexString();
+    const chainId_tx = ethers.BigNumber.from(chainId.toString()).toHexString();
 
     const txData = {
       data,
@@ -116,7 +118,7 @@ describe("Sign EVM Transactions", function () {
       nonce,
       to,
       value: value_hex,
-      chainId: chainId.toHexString(),
+      chainId: chainId_tx,
       accessList: [],
       type,
     };
@@ -138,10 +140,11 @@ describe("Sign EVM Transactions", function () {
     );
   });
   it("Sign EIP2930 Transaction", async function () {
-    const res = await actor.get_caller_data();
-    const address = res.Ok.address;
+    const { chainId } = await ethers.provider.getNetwork();
+    const res = await actor.get_caller_data(chainId);
 
-    const nonce = await ethers.provider.getTransactionCount(address);
+    const nonce = Number(res.Ok.transactions.nonce);
+    console.log(nonce);
     const { maxPriorityFeePerGas, gasPrice } =
       await ethers.provider.getFeeData();
     const gasLimit = ethers.BigNumber.from("23000").toHexString();
@@ -149,9 +152,7 @@ describe("Sign EVM Transactions", function () {
     const value = "1";
     const value_hex = ethers.utils.parseEther(value).toHexString();
     const data = ethers.BigNumber.from("0").toHexString();
-    const chainId = await ethers.provider
-      .getNetwork()
-      .then((v) => ethers.BigNumber.from(v.chainId.toString()));
+    const chainId_tx = ethers.BigNumber.from(chainId.toString()).toHexString();
     const type = ethers.BigNumber.from("1").toHexString();
 
     const txData = {
@@ -162,7 +163,7 @@ describe("Sign EVM Transactions", function () {
       nonce,
       to,
       value: value_hex,
-      chainId: chainId.toHexString(),
+      chainId: chainId_tx,
       accessList: [],
       type,
     };
@@ -183,8 +184,10 @@ describe("Sign EVM Transactions", function () {
       otherUserAfter.sub(otherUserBefore).eq(ethers.utils.parseEther(value))
     );
   });
-  it.only("Deploy and used a contract hil", async function () {
-    const res = await actor.get_caller_data();
+  it("Deploy and used a contract with high level functions from canister", async function () {
+    const { chainId } = await ethers.provider.getNetwork();
+
+    const res = await actor.get_caller_data(chainId);
     const address = res.Ok.address;
 
     const contract = await ethers.getContractFactory("ExampleToken");
@@ -197,9 +200,6 @@ describe("Sign EVM Transactions", function () {
 
     const { maxFeePerGas, maxPriorityFeePerGas } =
       await ethers.provider.getFeeData();
-
-    const chainId = await ethers.provider.getNetwork().then((v) => v.chainId);
-    maxFeePerGas.toNumber();
 
     const res1 = await actor.deploy_evm_contract(
       [...bytecode],
@@ -246,7 +246,9 @@ describe("Sign EVM Transactions", function () {
     assert.ok(balanceOtherUser.eq(ethers.utils.parseUnits("1", 18)));
   });
   it("Deploy and used a contract", async function () {
-    const res = await actor.get_caller_data();
+    const { chainId } = await ethers.provider.getNetwork();
+
+    const res = await actor.get_caller_data(chainId);
     const address = res.Ok.address;
 
     const contract = await ethers.getContractFactory("Example");
@@ -260,15 +262,11 @@ describe("Sign EVM Transactions", function () {
     const { maxFeePerGas, maxPriorityFeePerGas } =
       await ethers.provider.getFeeData();
 
-    let nonce = await ethers.provider.getTransactionCount(address);
+    let nonce = Number(res.Ok.transactions.nonce);
 
     const value = ethers.BigNumber.from("0");
-
-    const chainId = await ethers.provider
-      .getNetwork()
-      .then((v) => ethers.BigNumber.from(v.chainId.toString()));
-
     const type = ethers.BigNumber.from("2");
+    const chainId_tx = ethers.BigNumber.from(chainId.toString()).toHexString();
 
     const txDataDeployContract = {
       data,
@@ -278,7 +276,7 @@ describe("Sign EVM Transactions", function () {
       nonce,
       to: null,
       value: value.toHexString(),
-      chainId: chainId.toHexString(),
+      chainId: chainId_tx,
       accessList: [],
       type: type.toHexString(),
     };
@@ -308,7 +306,7 @@ describe("Sign EVM Transactions", function () {
 
     const setNameEncoded = iface.encodeFunctionData("setName", ["bar"]);
     const gasLimit = await deployedContract.estimateGas.setName("bar");
-    nonce = await ethers.provider.getTransactionCount(address);
+    nonce = nonce + 1;
 
     const txData = {
       data: setNameEncoded,
@@ -318,7 +316,7 @@ describe("Sign EVM Transactions", function () {
       nonce,
       to: deployedContract.address,
       value: value.toHexString(),
-      chainId: chainId.toHexString(),
+      chainId: chainId_tx,
       accessList: [],
       type: type.toHexString(),
     };
