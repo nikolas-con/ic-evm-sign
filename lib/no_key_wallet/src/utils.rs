@@ -44,6 +44,11 @@ pub fn string_to_vec_u8(str: &str) -> Vec<u8> {
         .map(|i| u8::from_str_radix(&str[i..i + 2], 16).unwrap())
         .collect::<Vec<u8>>()
 }
+pub fn remove_leading(vec: Vec<u8>, element: u8) -> Vec<u8> {
+    let start = vec.iter().position(|&x| x != element).unwrap();
+    let result = &vec[start..];
+    result.to_vec()
+}
 pub fn u64_to_vec_u8(u: &u64) -> Vec<u8> {
     u.to_be_bytes()
         .into_iter()

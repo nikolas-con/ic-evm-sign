@@ -1,4 +1,6 @@
-use crate::utils::{string_to_vec_u8, u64_to_vec_u8, vec_u8_to_string, vec_u8_to_u64};
+use crate::utils::{
+    remove_leading, string_to_vec_u8, u64_to_vec_u8, vec_u8_to_string, vec_u8_to_u64,
+};
 use easy_hasher::easy_hasher;
 #[derive(Debug, Clone, PartialEq)]
 enum TransactionType {
@@ -107,8 +109,12 @@ impl Sign for TransactionLegacy {
     fn sign(&mut self, signature: Vec<u8>, public_key: Vec<u8>) -> Result<Vec<u8>, String> {
         let chain_id = u8::try_from(self.chain_id).unwrap();
 
-        let r = vec_u8_to_string(&signature[..32].to_vec());
-        let s = vec_u8_to_string(&signature[32..].to_vec());
+        let r_remove_leading_zeros = remove_leading(signature[..32].to_vec(), 0);
+        let s_remove_leading_zeros = remove_leading(signature[32..].to_vec(), 0);
+
+        let r = vec_u8_to_string(&r_remove_leading_zeros);
+
+        let s = vec_u8_to_string(&s_remove_leading_zeros);
 
         let message = self.get_message_to_sign().unwrap();
         let recovery_id = find_recovery_id(&message, &signature, &public_key).unwrap();
@@ -118,9 +124,9 @@ impl Sign for TransactionLegacy {
         )
         .unwrap()]);
 
-        self.v = "0x".to_owned() + &v;
-        self.r = "0x".to_owned() + &r;
-        self.s = "0x".to_owned() + &s;
+        self.v = v;
+        self.r = r;
+        self.s = s;
 
         let result = self.serialize().unwrap();
         Ok(result)
@@ -314,8 +320,12 @@ impl Sign for Transaction2930 {
         Ok(keccak256.to_vec())
     }
     fn sign(&mut self, signature: Vec<u8>, public_key: Vec<u8>) -> Result<Vec<u8>, String> {
-        let r = vec_u8_to_string(&signature[..32].to_vec());
-        let s = vec_u8_to_string(&signature[32..].to_vec());
+        let r_remove_leading_zeros = remove_leading(signature[..32].to_vec(), 0);
+        let s_remove_leading_zeros = remove_leading(signature[32..].to_vec(), 0);
+
+        let r = vec_u8_to_string(&r_remove_leading_zeros);
+
+        let s = vec_u8_to_string(&s_remove_leading_zeros);
 
         let message = self.get_message_to_sign().unwrap();
         let recovery_id = find_recovery_id(&message, &signature, &public_key).unwrap();
@@ -418,7 +428,7 @@ impl Sign for Transaction2930 {
         stream.append(&v);
 
         let r: Vec<u8>;
-        if self.data.starts_with("0x") {
+        if self.r.starts_with("0x") {
             r = string_to_vec_u8(&self.r[2..]);
         } else {
             r = string_to_vec_u8(&self.r[..]);
@@ -546,8 +556,12 @@ impl Sign for Transaction1559 {
     }
 
     fn sign(&mut self, signature: Vec<u8>, public_key: Vec<u8>) -> Result<Vec<u8>, String> {
-        let r = vec_u8_to_string(&signature[..32].to_vec());
-        let s = vec_u8_to_string(&signature[32..].to_vec());
+        let r_remove_leading_zeros = remove_leading(signature[..32].to_vec(), 0);
+        let s_remove_leading_zeros = remove_leading(signature[32..].to_vec(), 0);
+
+        let r = vec_u8_to_string(&r_remove_leading_zeros);
+
+        let s = vec_u8_to_string(&s_remove_leading_zeros);
 
         let message = self.get_message_to_sign().unwrap();
         let recovery_id = find_recovery_id(&message, &signature, &public_key).unwrap();
@@ -832,5 +846,43 @@ mod tests {
             string_to_vec_u8("79965df63d7d9364f4bc8ed54ffd1c267042d4db673e129e3c459afbcb73a6f1");
         let result = find_recovery_id(&message, &signature, &public_key);
         assert_eq!(result, expected);
+    }
+    #[test]
+    fn access_list_encode() {
+        let expected = "f872f85994de0b295669a9fd93d5f28d9ec85e40f4cb697baef842a00000000000000000000000000000000000000000000000000000000000000003a00000000000000000000000000000000000000000000000000000000000000007d694bb9bc244d798123fde783fcc1c72d3bb8c189413c0";
+        let address_1 = "0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae".to_string();
+        let storage_keys_1 = vec![
+            "0x0000000000000000000000000000000000000000000000000000000000000003".to_string(),
+            "0x0000000000000000000000000000000000000000000000000000000000000007".to_string(),
+        ];
+
+        let address_2 = "0xbb9bc244d798123fde783fcc1c72d3bb8c189413".to_string();
+        let storage_keys_2 = vec![];
+
+        let access_list = vec![(address_1, storage_keys_1), (address_2, storage_keys_2)];
+        let encoded = encode_access_list(&access_list);
+        assert_eq!(vec_u8_to_string(&encoded), expected)
+    }
+    #[test]
+    fn access_list_decode() {
+        let expected: Vec<(String, Vec<String>)> = vec![
+            (
+                "de0b295669a9fd93d5f28d9ec85e40f4cb697bae".to_string(),
+                vec![
+                    "0000000000000000000000000000000000000000000000000000000000000003".to_string(),
+                    "0000000000000000000000000000000000000000000000000000000000000007".to_string(),
+                ],
+            ),
+            (
+                "bb9bc244d798123fde783fcc1c72d3bb8c189413".to_string(),
+                vec![],
+            ),
+        ];
+        let access_list = "f872f85994de0b295669a9fd93d5f28d9ec85e40f4cb697baef842a00000000000000000000000000000000000000000000000000000000000000003a00000000000000000000000000000000000000000000000000000000000000007d694bb9bc244d798123fde783fcc1c72d3bb8c189413c0";
+        let access_list_hex = string_to_vec_u8(&access_list);
+
+        let decode = decode_access_list(&access_list_hex);
+        println!("{:?}", decode);
+        assert_eq!(decode, expected);
     }
 }
