@@ -765,12 +765,12 @@ fn encode_access_list(access_list: &Vec<(String, Vec<String>)>) -> Vec<u8> {
         let mut stream_tuple = rlp::RlpStream::new_list(2);
 
         // append address
-        stream_tuple.append(&string_to_vec_u8(&list.0[2..]));
+        stream_tuple.append(&string_to_vec_u8(&list.0[..]));
 
         // append storage keys
         let mut stream_storage_keys = rlp::RlpStream::new_list(list.1.len());
         for storage_key in list.1.clone() {
-            stream_storage_keys.append(&string_to_vec_u8(&storage_key[2..]));
+            stream_storage_keys.append(&string_to_vec_u8(&storage_key[..]));
         }
         stream_tuple.append_raw(&stream_storage_keys.out(), 1);
 
