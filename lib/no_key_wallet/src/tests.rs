@@ -1,6 +1,6 @@
 use super::*;
 use crate::transaction::Sign;
-use crate::utils::{recover_address, vec_u8_to_string};
+use crate::utils::{string_to_vec_u8, vec_u8_to_string};
 use ic_cdk::export::Principal;
 
 use futures::executor::block_on;
@@ -59,7 +59,7 @@ fn sign_legacy_transaction() {
     let recovery_id = tx_signed.get_recovery_id().unwrap();
     assert_eq!(recovery_id, expected_get_recovery_id_after);
 
-    let address = recover_address(signature, recovery_id, msg);
+    let address = recover_address(signature, recovery_id, msg).unwrap();
     assert_eq!(address, expected_address);
 
     assert_eq!(res0.address, address)
@@ -114,7 +114,7 @@ fn sign_eip2930_transaction() {
     let recovery_id = tx_signed.get_recovery_id().unwrap();
     assert_eq!(recovery_id, expected_get_recovery_id_after);
 
-    let address = recover_address(signature, recovery_id, message);
+    let address = recover_address(signature, recovery_id, message).unwrap();
     assert_eq!(address, expected_address);
 
     assert_eq!(res0.address, address)
@@ -169,8 +169,73 @@ fn sign_eip1559_transaction() {
     );
     let recovery_id = tx_signed.get_recovery_id().unwrap();
     assert_eq!(recovery_id, expected_get_recovery_id_after);
-    let address = recover_address(signature, recovery_id, message);
+    let address = recover_address(signature, recovery_id, message).unwrap();
     assert_eq!(address, expected_address);
 
     assert_eq!(res0.address, address)
+}
+
+#[test]
+fn recover_address_valid() {
+    let expected = "0x907dc4d0be5d691970cae886fcab34ed65a2cd66";
+
+    let signature =string_to_vec_u8("29edd4e1d65e1b778b464112d2febc6e97bb677aba5034408fd27b49921beca94c4e5b904d58553bcd9c788360e0bd55c513922cf1f33a6386033e886cd4f77f");
+    let recovery_id = 0;
+    let message =
+        string_to_vec_u8("79965df63d7d9364f4bc8ed54ffd1c267042d4db673e129e3c459afbcb73a6f1");
+    let result = recover_address(signature, recovery_id, message).unwrap();
+
+    assert_eq!(result, expected);
+}
+#[test]
+fn recover_address_with_invalid_signature() {
+    let expected = Err("Invalid signature".to_string());
+
+    let signature = string_to_vec_u8("");
+    let recovery_id = 0;
+    let message =
+        string_to_vec_u8("79965df63d7d9364f4bc8ed54ffd1c267042d4db673e129e3c459afbcb73a6f1");
+    let result = recover_address(signature, recovery_id, message);
+
+    assert_eq!(result, expected);
+}
+#[test]
+fn recover_address_with_invalid_message() {
+    let expected = Err("Invalid message".to_string());
+
+    let signature = string_to_vec_u8("29edd4e1d65e1b778b464112d2febc6e97bb677aba5034408fd27b49921beca94c4e5b904d58553bcd9c788360e0bd55c513922cf1f33a6386033e886cd4f77f");
+    let recovery_id = 0;
+    let message = string_to_vec_u8("");
+    let result = recover_address(signature, recovery_id, message);
+
+    assert_eq!(result, expected);
+}
+
+fn recover_address(
+    signature: Vec<u8>,
+    recovery_id: u8,
+    message: Vec<u8>,
+) -> Result<String, String> {
+    if signature.len() != 64 {
+        return Err("Invalid signature".to_string());
+    }
+    if message.len() != 32 {
+        return Err("Invalid message".to_string());
+    }
+
+    let signature_bytes: [u8; 64] = signature[..].try_into().unwrap();
+    let signature_bytes_64 = libsecp256k1::Signature::parse_standard(&signature_bytes).unwrap();
+
+    let recovery_id_byte =
+        libsecp256k1::RecoveryId::parse(u8::try_from(recovery_id).unwrap()).unwrap();
+
+    let message_bytes: [u8; 32] = message[..].try_into().unwrap();
+    let message_bytes_32 = libsecp256k1::Message::parse(&message_bytes);
+
+    let public_key =
+        libsecp256k1::recover(&message_bytes_32, &signature_bytes_64, &recovery_id_byte).unwrap();
+
+    let address = get_address_from_public_key(public_key.serialize_compressed().to_vec()).unwrap();
+
+    Ok(address)
 }

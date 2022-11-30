@@ -9,7 +9,7 @@ enum TransactionType {
 
 pub trait Sign {
     fn get_message_to_sign(&self) -> Result<Vec<u8>, String>;
-    fn sign(&mut self, signature: Vec<u8>, rec_id: u64) -> Result<Vec<u8>, String>;
+    fn sign(&mut self, signature: Vec<u8>, public_key: Vec<u8>) -> Result<Vec<u8>, String>;
     fn is_signed(&self) -> bool;
     fn get_signature(&self) -> Result<Vec<u8>, String>;
     fn get_recovery_id(&self) -> Result<u8, String>;
@@ -104,13 +104,17 @@ impl Sign for TransactionLegacy {
 
         Ok(keccak256.to_vec())
     }
-    fn sign(&mut self, signature: Vec<u8>, rec_id: u64) -> Result<Vec<u8>, String> {
+    fn sign(&mut self, signature: Vec<u8>, public_key: Vec<u8>) -> Result<Vec<u8>, String> {
         let chain_id = u8::try_from(self.chain_id).unwrap();
 
         let r = vec_u8_to_string(&signature[..32].to_vec());
         let s = vec_u8_to_string(&signature[32..].to_vec());
+
+        let message = self.get_message_to_sign().unwrap();
+        let recovery_id = find_recovery_id(&message, &signature, &public_key).unwrap();
+
         let v = vec_u8_to_string(&vec![u8::try_from(
-            chain_id * 2 + 35 + u8::try_from(rec_id).unwrap(),
+            chain_id * 2 + 35 + u8::try_from(recovery_id).unwrap(),
         )
         .unwrap()]);
 
@@ -309,11 +313,14 @@ impl Sign for Transaction2930 {
         let keccak256 = easy_hasher::raw_keccak256(msg);
         Ok(keccak256.to_vec())
     }
-    fn sign(&mut self, signature: Vec<u8>, rec_id: u64) -> Result<Vec<u8>, String> {
+    fn sign(&mut self, signature: Vec<u8>, public_key: Vec<u8>) -> Result<Vec<u8>, String> {
         let r = vec_u8_to_string(&signature[..32].to_vec());
         let s = vec_u8_to_string(&signature[32..].to_vec());
+
+        let message = self.get_message_to_sign().unwrap();
+        let recovery_id = find_recovery_id(&message, &signature, &public_key).unwrap();
         let v: String;
-        if rec_id == 0 {
+        if recovery_id == 0 {
             v = "".to_string();
         } else {
             v = "01".to_string();
@@ -535,16 +542,19 @@ impl Sign for Transaction1559 {
         Ok(keccak256.to_vec())
     }
 
-    fn sign(&mut self, signature: Vec<u8>, rec_id: u64) -> Result<Vec<u8>, String> {
+    fn sign(&mut self, signature: Vec<u8>, public_key: Vec<u8>) -> Result<Vec<u8>, String> {
         let r = vec_u8_to_string(&signature[..32].to_vec());
         let s = vec_u8_to_string(&signature[32..].to_vec());
 
+        let message = self.get_message_to_sign().unwrap();
+        let recovery_id = find_recovery_id(&message, &signature, &public_key).unwrap();
         let v: String;
-        if rec_id == 0 {
+        if recovery_id == 0 {
             v = "".to_string();
         } else {
             v = "01".to_string();
         }
+
         self.v = v;
         self.r = r;
         self.s = s;
@@ -694,5 +704,92 @@ fn get_transaction_type(hex_raw_tx: &Vec<u8>) -> Result<TransactionType, String>
         Ok(TransactionType::EIP1559)
     } else {
         Err(String::from("Invalid type"))
+    }
+}
+
+fn find_recovery_id(
+    message: &Vec<u8>,
+    signature: &Vec<u8>,
+    public_key: &Vec<u8>,
+) -> Result<usize, String> {
+    if signature.len() != 64 {
+        return Err("Invalid signature".to_string());
+    }
+    if message.len() != 32 {
+        return Err("Invalid message".to_string());
+    }
+    if public_key.len() != 33 {
+        return Err("Invalid public key".to_string());
+    }
+
+    for i in 0..3 {
+        let recovery_id = libsecp256k1::RecoveryId::parse_rpc(27 + i).unwrap();
+
+        let signature_bytes: [u8; 64] = signature[..].try_into().unwrap();
+        let signature_bytes_64 = libsecp256k1::Signature::parse_standard(&signature_bytes).unwrap();
+
+        let message_bytes: [u8; 32] = message[..].try_into().unwrap();
+        let message_bytes_32 = libsecp256k1::Message::parse(&message_bytes);
+
+        let key =
+            libsecp256k1::recover(&message_bytes_32, &signature_bytes_64, &recovery_id).unwrap();
+        if key.serialize_compressed() == public_key[..] {
+            return Ok(i as usize);
+        }
+    }
+    return Err("Not found".to_string());
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn find_recovery_id_valid() {
+        let expected = 0;
+
+        let public_key =
+            string_to_vec_u8("02c397f23149d3464517d57b7cdc8e287428407f9beabfac731e7c24d536266cd1");
+        let signature =string_to_vec_u8("29edd4e1d65e1b778b464112d2febc6e97bb677aba5034408fd27b49921beca94c4e5b904d58553bcd9c788360e0bd55c513922cf1f33a6386033e886cd4f77f");
+        let message =
+            string_to_vec_u8("79965df63d7d9364f4bc8ed54ffd1c267042d4db673e129e3c459afbcb73a6f1");
+        let result = find_recovery_id(&message, &signature, &public_key).unwrap();
+        assert_eq!(result, expected);
+    }
+    #[test]
+    fn find_recovery_id_with_invalid_signature() {
+        let expected = Err("Invalid signature".to_string());
+
+        let public_key =
+            string_to_vec_u8("02c397f23149d3464517d57b7cdc8e287428407f9beabfac731e7c24d536266cd1");
+        let signature = string_to_vec_u8("");
+        let message =
+            string_to_vec_u8("79965df63d7d9364f4bc8ed54ffd1c267042d4db673e129e3c459afbcb73a6f1");
+        let result = find_recovery_id(&message, &signature, &public_key);
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn find_recovery_id_with_invalid_message() {
+        let expected = Err("Invalid message".to_string());
+
+        let public_key =
+            string_to_vec_u8("02c397f23149d3464517d57b7cdc8e287428407f9beabfac731e7c24d536266cd1");
+        let signature = string_to_vec_u8("29edd4e1d65e1b778b464112d2febc6e97bb677aba5034408fd27b49921beca94c4e5b904d58553bcd9c788360e0bd55c513922cf1f33a6386033e886cd4f77f");
+        let message = string_to_vec_u8("");
+        let result = find_recovery_id(&message, &signature, &public_key);
+        assert_eq!(result, expected);
+    }
+    #[test]
+    fn find_recovery_id_with_invalid_public_key() {
+        let expected = Err("Invalid public key".to_string());
+
+        let public_key = string_to_vec_u8("");
+        let signature = string_to_vec_u8("29edd4e1d65e1b778b464112d2febc6e97bb677aba5034408fd27b49921beca94c4e5b904d58553bcd9c788360e0bd55c513922cf1f33a6386033e886cd4f77f");
+        let message =
+            string_to_vec_u8("79965df63d7d9364f4bc8ed54ffd1c267042d4db673e129e3c459afbcb73a6f1");
+        let result = find_recovery_id(&message, &signature, &public_key);
+        assert_eq!(result, expected);
     }
 }

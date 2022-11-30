@@ -5,20 +5,27 @@ pub fn get_derivation_path(caller: Principal) -> Vec<u8> {
     caller.as_slice().to_vec()
 }
 
-pub fn compute_address(public_key: Vec<u8>) -> String {
+pub fn get_address_from_public_key(public_key: Vec<u8>) -> Result<String, String> {
+    if public_key.len() != 33 {
+        return Err("Invalid length of public key".to_string());
+    }
+
     let pub_key_arr: [u8; 33] = public_key[..].try_into().unwrap();
     let pub_key = libsecp256k1::PublicKey::parse_compressed(&pub_key_arr)
-        .unwrap()
+        .map_err(|e| format!("{}", e))?
         .serialize();
 
     let keccak256 = easy_hasher::raw_keccak256(pub_key[1..].to_vec());
     let keccak256_hex = keccak256.to_hex_string();
     let address: String = "0x".to_owned() + &keccak256_hex[24..];
 
-    address
+    Ok(address)
 }
 
-pub fn get_transfer_data(address: &str, value: u64) -> String {
+pub fn get_transfer_data(address: &str, value: u64) -> Result<String, String> {
+    if address.len() != 42 {
+        return Err("Invalid address".to_string());
+    }
     let method_sig = "transfer(address,uint256)";
     let keccak256 = easy_hasher::raw_keccak256(method_sig.as_bytes().to_vec());
     let method_id = &keccak256.to_hex_string()[..8];
@@ -28,30 +35,7 @@ pub fn get_transfer_data(address: &str, value: u64) -> String {
     let value_hex = format!("{:02x}", value);
     let value_64 = format!("{:0>64}", value_hex);
 
-    method_id.to_owned() + &address_64 + &value_64
-}
-
-pub fn get_rec_id(
-    message: &Vec<u8>,
-    signature: &Vec<u8>,
-    public_key: &Vec<u8>,
-) -> Result<usize, String> {
-    for i in 0..3 {
-        let recovery_id = libsecp256k1::RecoveryId::parse_rpc(27 + i).unwrap();
-
-        let signature_bytes: [u8; 64] = signature[..].try_into().unwrap();
-        let signature_bytes_64 = libsecp256k1::Signature::parse_standard(&signature_bytes).unwrap();
-
-        let message_bytes: [u8; 32] = message[..].try_into().unwrap();
-        let message_bytes_32 = libsecp256k1::Message::parse(&message_bytes);
-
-        let key =
-            libsecp256k1::recover(&message_bytes_32, &signature_bytes_64, &recovery_id).unwrap();
-        if key.serialize_compressed() == public_key[..] {
-            return Ok(i as usize);
-        }
-    }
-    return Err("Not found".to_string());
+    Ok(method_id.to_owned() + &address_64 + &value_64)
 }
 
 pub fn string_to_vec_u8(str: &str) -> Vec<u8> {
@@ -82,18 +66,51 @@ pub fn vec_u8_to_u64(vec: &Vec<u8>) -> u64 {
 }
 
 #[cfg(test)]
-pub fn recover_address(signature: Vec<u8>, recovery_id: u8, message: Vec<u8>) -> String {
-    let signature_bytes: [u8; 64] = signature[..].try_into().unwrap();
-    let signature_bytes_64 = libsecp256k1::Signature::parse_standard(&signature_bytes).unwrap();
+mod tests {
 
-    let recovery_id_byte =
-        libsecp256k1::RecoveryId::parse(u8::try_from(recovery_id).unwrap()).unwrap();
+    use super::*;
 
-    let message_bytes: [u8; 32] = message[..].try_into().unwrap();
-    let message_bytes_32 = libsecp256k1::Message::parse(&message_bytes);
+    #[test]
+    fn get_address_from_public_key_valid() {
+        let expected = "0x907dc4d0be5d691970cae886fcab34ed65a2cd66";
+        let public_key_str = "02c397f23149d3464517d57b7cdc8e287428407f9beabfac731e7c24d536266cd1";
+        let public_key_to_vec = string_to_vec_u8(&public_key_str);
+        let result = get_address_from_public_key(public_key_to_vec).unwrap();
+        assert_eq!(result, expected);
+    }
 
-    let public_key =
-        libsecp256k1::recover(&message_bytes_32, &signature_bytes_64, &recovery_id_byte).unwrap();
+    #[test]
+    fn get_address_from_public_with_zeros() {
+        let expected = Err("Invalid public key".to_string());
+        let public_key_str = "000000000000000000000000000000000000000000000000000000000000000000";
+        let public_key_to_vec = string_to_vec_u8(&public_key_str);
+        let result = get_address_from_public_key(public_key_to_vec);
+        assert_eq!(result, expected);
+    }
+    #[test]
+    fn get_address_from_public_with_empty_public_key() {
+        let expected = Err("Invalid length of public key".to_string());
+        let public_key_str = "";
+        let public_key_to_vec = string_to_vec_u8(&public_key_str);
+        let result = get_address_from_public_key(public_key_to_vec);
+        assert_eq!(result, expected);
+    }
 
-    compute_address(public_key.serialize_compressed().to_vec())
+    #[test]
+    fn get_transfer_data_valid() {
+        let expected ="a9059cbb000000000000000000000000907dc4d0be5d691970cae886fcab34ed65a2cd660000000000000000000000000000000000000000000000000000000000000001";
+
+        let address = "0x907dc4d0be5d691970cae886fcab34ed65a2cd66";
+        let value = 1;
+        let result = get_transfer_data(address, value).unwrap();
+        assert_eq!(result, expected);
+    }
+    #[test]
+    fn get_transfer_data_with_invalid_address() {
+        let expected = Err("Invalid address".to_string());
+        let address = "0x00";
+        let value = 1;
+        let result = get_transfer_data(address, value);
+        assert_eq!(result, expected);
+    }
 }

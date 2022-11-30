@@ -13,7 +13,7 @@ mod mocks;
 use mocks::{ic_call, ic_timestamp};
 
 pub mod utils;
-use utils::{compute_address, get_derivation_path, get_rec_id};
+use utils::{get_address_from_public_key, get_derivation_path};
 
 pub mod ecdsa;
 use ecdsa::reply::*;
@@ -80,7 +80,7 @@ pub async fn create(principal_id: Principal) -> Result<CreateResponse, String> {
     .await
     .map_err(|e| format!("Failed to call ecdsa_public_key {}", e.1))?;
 
-    let address = compute_address(res.public_key.clone());
+    let address = get_address_from_public_key(res.public_key.clone()).unwrap();
 
     let mut user = User::default();
     user.public_key = res.public_key;
@@ -133,11 +133,7 @@ pub async fn sign(
     .await
     .map_err(|e| format!("Failed to call sign_with_ecdsa {}", e.1))?;
 
-    let rec_id = get_rec_id(&message, &res.signature, &user.public_key).unwrap();
-
-    let signed_tx = tx
-        .sign(res.signature.clone(), u64::try_from(rec_id).unwrap())
-        .unwrap();
+    let signed_tx = tx.sign(res.signature.clone(), user.public_key).unwrap();
 
     STATE.with(|s| {
         let mut state = s.borrow_mut();
@@ -233,7 +229,7 @@ pub async fn transfer_erc_20(
         nonce = 0;
     }
 
-    let data = "0x".to_owned() + &utils::get_transfer_data(&address, value);
+    let data = "0x".to_owned() + &utils::get_transfer_data(&address, value).unwrap();
 
     let tx = transaction::Transaction1559 {
         nonce,
@@ -266,7 +262,7 @@ pub fn get_caller_data(principal_id: Principal, chain_id: u64) -> Result<CallerR
         return Err("this user does not exist".to_string());
     }
 
-    let address = compute_address(user.public_key.clone());
+    let address = get_address_from_public_key(user.public_key.clone()).unwrap();
 
     let chain_data = user
         .transactions
