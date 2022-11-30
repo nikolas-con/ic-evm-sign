@@ -1,6 +1,6 @@
 use crate::ecdsa::reply::{ECDSAPublicKeyReply, SignWithECDSAReply};
 use crate::ecdsa::request::SignWithECDSA;
-use crate::utils::{string_to_vec_u8, vec_u8_to_string};
+use crate::utils::string_to_vec_u8;
 use candid::de::IDLDeserialize;
 use candid::utils::{ArgumentDecoder, ArgumentEncoder};
 use candid::{Decode, Encode};
