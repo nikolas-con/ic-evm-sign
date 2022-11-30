@@ -230,7 +230,7 @@ pub struct Transaction2930 {
     pub to: String,
     pub value: u64,
     pub data: String,
-    pub access_list: Vec<u8>,
+    pub access_list: Vec<(String, Vec<String>)>,
     pub v: String,
     pub r: String,
     pub s: String,
@@ -261,7 +261,7 @@ impl From<Vec<u8>> for Transaction2930 {
         let data_tx_hex = rlp.at(6).as_val::<Vec<u8>>();
         let data_tx = vec_u8_to_string(&data_tx_hex);
 
-        let access_list = rlp.at(7).as_raw().to_vec();
+        let access_list = decode_access_list(&rlp.at(7).as_raw().to_vec());
 
         let v_hex = rlp.at(8).as_val::<Vec<u8>>();
         let v = vec_u8_to_string(&v_hex);
@@ -304,8 +304,8 @@ impl Sign for Transaction2930 {
             stream.append(&item);
         }
 
-        let item_count: usize = 1;
-        stream.append_raw(&self.access_list, item_count);
+        let access_list = encode_access_list(&self.access_list);
+        stream.append_raw(&access_list, 1);
 
         let decode_tx = stream.out();
 
@@ -406,7 +406,8 @@ impl Sign for Transaction2930 {
         }
         stream.append(&data);
 
-        stream.append_raw(&&self.access_list[..], 1);
+        let access_list = encode_access_list(&self.access_list);
+        stream.append_raw(&access_list[..], 1);
 
         let v: Vec<u8>;
         if self.data.starts_with("0x") {
@@ -450,7 +451,7 @@ pub struct Transaction1559 {
     pub to: String,
     pub value: u64,
     pub data: String,
-    pub access_list: Vec<u8>,
+    pub access_list: Vec<(String, Vec<String>)>,
     pub v: String,
     pub r: String,
     pub s: String,
@@ -484,7 +485,7 @@ impl From<Vec<u8>> for Transaction1559 {
         let data_tx_hex = rlp.at(7).as_val::<Vec<u8>>();
         let data_tx = vec_u8_to_string(&data_tx_hex);
 
-        let access_list = rlp.at(8).as_raw().to_vec();
+        let access_list = decode_access_list(&rlp.at(8).as_raw().to_vec());
 
         let v_hex = rlp.at(9).as_val::<Vec<u8>>();
         let v = vec_u8_to_string(&v_hex);
@@ -531,7 +532,9 @@ impl Sign for Transaction1559 {
             stream.append(item);
         }
 
-        stream.append_raw(&self.access_list, 1);
+        let access_list = encode_access_list(&self.access_list);
+
+        stream.append_raw(&access_list[..], 1);
 
         let decode_tx = stream.out();
 
@@ -637,7 +640,9 @@ impl Sign for Transaction1559 {
         }
         stream.append(&data);
 
-        stream.append_raw(&self.access_list, 1);
+        let access_list = encode_access_list(&self.access_list);
+
+        stream.append_raw(&access_list[..], 1);
 
         let v: Vec<u8>;
         if self.to.starts_with("0x") {
@@ -739,7 +744,43 @@ fn find_recovery_id(
     }
     return Err("Not found".to_string());
 }
+fn encode_access_list(access_list: &Vec<(String, Vec<String>)>) -> Vec<u8> {
+    let mut stream = rlp::RlpStream::new_list(access_list.len());
 
+    for list in access_list {
+        let mut stream_tuple = rlp::RlpStream::new_list(2);
+
+        // append address
+        stream_tuple.append(&string_to_vec_u8(&list.0[2..]));
+
+        // append storage keys
+        let mut stream_storage_keys = rlp::RlpStream::new_list(list.1.len());
+        for storage_key in list.1.clone() {
+            stream_storage_keys.append(&string_to_vec_u8(&storage_key[2..]));
+        }
+        stream_tuple.append_raw(&stream_storage_keys.out(), 1);
+
+        // append (address, storage_keys)
+        stream.append_raw(&stream_tuple.out(), 1);
+    }
+
+    stream.out().to_vec()
+}
+
+fn decode_access_list(access_list: &Vec<u8>) -> Vec<(String, Vec<String>)> {
+    let mut result = vec![];
+    let rlp = rlp::Rlp::new(access_list);
+    for item in rlp.iter() {
+        let address = item.at(0).as_val();
+        let storage_keys_u8 = item.at(1).as_list::<Vec<u8>>();
+        let storage_keys = storage_keys_u8
+            .iter()
+            .map(|x| vec_u8_to_string(x))
+            .collect::<Vec<String>>();
+        result.push((vec_u8_to_string(&address), storage_keys));
+    }
+    result
+}
 #[cfg(test)]
 mod tests {
 
