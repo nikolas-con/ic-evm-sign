@@ -179,47 +179,22 @@ impl Sign for TransactionLegacy {
         let gas_limit = u64_to_vec_u8(&self.gas_limit);
         stream.append(&gas_limit);
 
-        let to: Vec<u8>;
-        if self.to.starts_with("0x") {
-            to = string_to_vec_u8(&self.to[2..]);
-        } else {
-            to = string_to_vec_u8(&self.to[..]);
-        }
+        let to = string_to_vec_u8(&self.to[..]);
         stream.append(&to);
 
         let value = u64_to_vec_u8(&self.value);
         stream.append(&value);
 
-        let data: Vec<u8>;
-        if self.data.starts_with("0x") {
-            data = string_to_vec_u8(&self.data[2..]);
-        } else {
-            data = string_to_vec_u8(&self.data[..]);
-        }
+        let data = string_to_vec_u8(&self.data[..]);
         stream.append(&data);
 
-        let v: Vec<u8>;
-        if self.v.starts_with("0x") {
-            v = string_to_vec_u8(&self.v[2..]);
-        } else {
-            v = string_to_vec_u8(&self.v[..]);
-        }
+        let v = string_to_vec_u8(&self.v[..]);
         stream.append(&v);
 
-        let r: Vec<u8>;
-        if self.r.starts_with("0x") {
-            r = string_to_vec_u8(&self.r[2..]);
-        } else {
-            r = string_to_vec_u8(&self.r[..]);
-        }
+        let r = string_to_vec_u8(&self.r[..]);
         stream.append(&r);
 
-        let s: Vec<u8>;
-        if self.s.starts_with("0x") {
-            s = string_to_vec_u8(&self.s[2..]);
-        } else {
-            s = string_to_vec_u8(&self.s[..]);
-        }
+        let s = string_to_vec_u8(&self.s[..]);
         stream.append(&s);
 
         Ok(stream.out().to_vec())
@@ -397,50 +372,25 @@ impl Sign for Transaction2930 {
         let gas_limit = u64_to_vec_u8(&self.gas_limit);
         stream.append(&gas_limit);
 
-        let to: Vec<u8>;
-        if self.to.starts_with("0x") {
-            to = string_to_vec_u8(&self.to[2..]);
-        } else {
-            to = string_to_vec_u8(&self.to[..]);
-        }
+        let to = string_to_vec_u8(&self.to[..]);
         stream.append(&to);
 
         let value = u64_to_vec_u8(&self.value);
         stream.append(&value);
 
-        let data: Vec<u8>;
-        if self.data.starts_with("0x") {
-            data = string_to_vec_u8(&self.data[2..]);
-        } else {
-            data = string_to_vec_u8(&self.data[..]);
-        }
+        let data = string_to_vec_u8(&self.data[..]);
         stream.append(&data);
 
         let access_list = encode_access_list(&self.access_list);
         stream.append_raw(&access_list[..], 1);
 
-        let v: Vec<u8>;
-        if self.data.starts_with("0x") {
-            v = string_to_vec_u8(&self.v[2..]);
-        } else {
-            v = string_to_vec_u8(&self.v[..]);
-        }
+        let v = string_to_vec_u8(&self.v[..]);
         stream.append(&v);
 
-        let r: Vec<u8>;
-        if self.r.starts_with("0x") {
-            r = string_to_vec_u8(&self.r[2..]);
-        } else {
-            r = string_to_vec_u8(&self.r[..]);
-        }
+        let r = string_to_vec_u8(&self.r[..]);
         stream.append(&r);
 
-        let s: Vec<u8>;
-        if self.data.starts_with("0x") {
-            s = string_to_vec_u8(&self.s[2..]);
-        } else {
-            s = string_to_vec_u8(&self.s[..]);
-        }
+        let s = string_to_vec_u8(&self.s[..]);
         stream.append(&s);
 
         let result = stream.out().to_vec();
@@ -635,51 +585,26 @@ impl Sign for Transaction1559 {
         let gas_limit = u64_to_vec_u8(&self.gas_limit);
         stream.append(&gas_limit);
 
-        let to: Vec<u8>;
-        if self.to.starts_with("0x") {
-            to = string_to_vec_u8(&self.to[2..]);
-        } else {
-            to = string_to_vec_u8(&self.to[..]);
-        }
+        let to = string_to_vec_u8(&self.to[..]);
         stream.append(&to);
 
         let value = u64_to_vec_u8(&self.value);
         stream.append(&value);
 
-        let data: Vec<u8>;
-        if self.to.starts_with("0x") {
-            data = string_to_vec_u8(&self.data[2..]);
-        } else {
-            data = string_to_vec_u8(&self.data[..]);
-        }
+        let data = string_to_vec_u8(&self.data[..]);
         stream.append(&data);
 
         let access_list = encode_access_list(&self.access_list);
 
         stream.append_raw(&access_list[..], 1);
 
-        let v: Vec<u8>;
-        if self.to.starts_with("0x") {
-            v = string_to_vec_u8(&self.v[2..]);
-        } else {
-            v = string_to_vec_u8(&self.v[..]);
-        }
+        let v = string_to_vec_u8(&self.v[..]);
         stream.append(&v);
 
-        let r: Vec<u8>;
-        if self.to.starts_with("0x") {
-            r = string_to_vec_u8(&self.r[2..]);
-        } else {
-            r = string_to_vec_u8(&self.r[..]);
-        }
+        let r = string_to_vec_u8(&self.r[..]);
         stream.append(&r);
 
-        let s: Vec<u8>;
-        if self.to.starts_with("0x") {
-            s = string_to_vec_u8(&self.s[2..]);
-        } else {
-            s = string_to_vec_u8(&self.s[..]);
-        }
+        let s = string_to_vec_u8(&self.s[..]);
         stream.append(&s);
 
         let result = stream.out().to_vec();

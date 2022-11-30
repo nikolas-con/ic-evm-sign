@@ -39,7 +39,14 @@ pub fn get_transfer_data(address: &str, value: u64) -> Result<String, String> {
 }
 
 pub fn string_to_vec_u8(str: &str) -> Vec<u8> {
-    (0..str.len())
+    let starts_from: usize;
+    if str.starts_with("0x") {
+        starts_from = 2;
+    } else {
+        starts_from = 0;
+    }
+
+    (starts_from..str.len())
         .step_by(2)
         .map(|i| u8::from_str_radix(&str[i..i + 2], 16).unwrap())
         .collect::<Vec<u8>>()
