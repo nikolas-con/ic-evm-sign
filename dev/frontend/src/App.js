@@ -3,6 +3,15 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Actor, HttpAgent } from "@dfinity/agent";
 import { AuthClient } from "@dfinity/auth-client";
 import { Principal } from "@dfinity/principal";
+import {
+  Box,
+  Button,
+  Text,
+  Heading,
+  Input,
+  UnorderedList,
+  ListItem,
+} from "@chakra-ui/react";
 
 import { ethers } from "ethers";
 
@@ -24,6 +33,10 @@ const idleServiceOptions = (IDL) => {
     data: IDL.Vec(IDL.Nat8),
     timestamp: IDL.Nat64,
   });
+  const chainData = IDL.Record({
+    nonce: IDL.Nat64,
+    transactions: IDL.Vec(transactions),
+  });
   const create_response = IDL.Record({
     address: IDL.Text,
   });
@@ -33,7 +46,7 @@ const idleServiceOptions = (IDL) => {
 
   const caller_response = IDL.Record({
     address: IDL.Text,
-    transactions: IDL.Vec(transactions),
+    transactions: chainData,
   });
 
   return {
@@ -49,7 +62,7 @@ const idleServiceOptions = (IDL) => {
     ),
     clear_caller_history: IDL.Func([], [], ["update"]),
     get_caller_data: IDL.Func(
-      [],
+      [IDL.Nat64],
       [IDL.Variant({ Ok: caller_response, Err: IDL.Text })],
       ["query"]
     ),
@@ -60,6 +73,7 @@ const idlFactory = ({ IDL }) => IDL.Service(idleServiceOptions(IDL));
 
 const App = () => {
   const [actor, setActor] = useState(null);
+  const [chainId, setChainId] = useState(null);
   const [authClient, setAuthClient] = useState(null);
   const [provider, setProvider] = useState(null);
   const [address, setAddress] = useState(null);
@@ -107,7 +121,11 @@ const App = () => {
 
   const intiEth = useCallback(async () => {
     const rpcProvider = new ethers.providers.JsonRpcProvider(RPC_URL);
-    if (!provider) setProvider(rpcProvider);
+    if (!provider) {
+      setProvider(rpcProvider);
+      const { chainId } = await rpcProvider.getNetwork();
+      setChainId(chainId);
+    }
   }, []);
 
   useEffect(() => {
@@ -126,19 +144,21 @@ const App = () => {
     });
 
     try {
-      const res = await actor.get_caller_data();
+      const res = await actor.get_caller_data(Number(chainId));
       const { address, transactions } = res.Ok;
       setAddress(address);
-      setTransactions(transactions);
+      setTransactions(transactions.transactions);
       const balance = await provider.getBalance(address);
       setBalance(ethers.utils.formatEther(balance));
     } catch (error) {
+      console.log("ss");
       console.log(error);
     }
   };
 
   const handleSignTx = async (e) => {
     e.preventDefault();
+    console.log(typeof e.target.address.value);
     const transaction = {
       nonce: await provider.getTransactionCount(address),
       gasPrice: await provider.getGasPrice().then((s) => s.toHexString()),
@@ -154,8 +174,6 @@ const App = () => {
     );
 
     setStage("signing transaction...");
-
-    const { chainId } = await provider.getNetwork();
 
     const res = await actor.sign_evm_tx([...serializeTx], Number(chainId));
 
@@ -202,59 +220,59 @@ const App = () => {
   };
 
   return (
-    <div>
+    <Box>
       {loggedIn ? (
         <>
-          <div>
-            <button onClick={logout}>log out</button>
-            {address && <p>EVM Address: {address}</p>}
-            {balance && <p>Balance: {balance}</p>}
-          </div>
+          <Box>
+            <Button onClick={logout}>log out</Button>
+            {address && <Text>EVM Address: {address}</Text>}
+            {balance && <Text>Balance: {balance}</Text>}
+          </Box>
 
           {!address ? (
-            <button onClick={handleCreateEVMWallet}>Create EVM Wallet</button>
+            <Button onClick={handleCreateEVMWallet}>Create EVM Wallet</Button>
           ) : balance === "0.0" ? (
-            <div>
-              <button onClick={handleTopUp}>Top up</button>
-            </div>
+            <Box>
+              <Button onClick={handleTopUp}>Top up</Button>
+            </Box>
           ) : (
             <>
               <form onSubmit={handleSignTx}>
-                <input name="amount" placeholder="value" />
-                <input name="address" placeholder="To address" />
-                <button type="submit">Send ETH</button>
+                <Input name="address" placeholder="To address" />
+                <Input name="amount" placeholder="value" />
+                <Button type="submit">Send ETH</Button>
               </form>
-              <div>
-                <span>{stage}</span>
-              </div>
-              <div>
-                <p>Transactions History</p>
+              <Box>
+                <Text>{stage}</Text>
+              </Box>
+              <Box>
+                <Text>Transactions History</Text>
                 {transactions.length > 0 && (
-                  <button onClick={handleCleanTxHistory}>
+                  <Button onClick={handleCleanTxHistory}>
                     Clean Transaction History
-                  </button>
+                  </Button>
                 )}
 
-                <ul>
+                <UnorderedList>
                   {transactions.map((tx, index) => (
-                    <li key={index}>
+                    <ListItem key={index}>
                       {ethers.utils.parseTransaction(tx.data).hash}
-                    </li>
+                    </ListItem>
                   ))}
-                </ul>
-              </div>
+                </UnorderedList>
+              </Box>
             </>
           )}
         </>
       ) : (
-        <div>
-          <h2>Not authenticated</h2>
-          <button type="button" onClick={login}>
+        <Box>
+          <Heading as="h1">Not authenticated</Heading>
+          <Button colorScheme="blue" onClick={login}>
             Log in
-          </button>
-        </div>
+          </Button>
+        </Box>
       )}
-    </div>
+    </Box>
   );
 };
 

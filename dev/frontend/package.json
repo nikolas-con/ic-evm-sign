@@ -3,11 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@chakra-ui/react": "^2.4.2",
     "@dfinity/agent": "^0.14.0",
     "@dfinity/auth-client": "^0.14.0",
     "@dfinity/principal": "^0.14.0",
+    "@emotion/react": "^11.10.5",
+    "@emotion/styled": "^11.10.5",
     "buffer": "^5.7.1",
     "ethers": "^5.7.2",
+    "framer-motion": "^7.6.15",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
