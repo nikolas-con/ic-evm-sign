@@ -286,22 +286,22 @@ pub fn clear_caller_history(principal_id: Principal, chain_id: u64) -> Result<()
     STATE.with(|s| {
         let mut state = s.borrow_mut();
         let user = state.users.get_mut(&principal_id).unwrap();
-        let user_tx = user.transactions.get_mut(&chain_id).unwrap();
-        user_tx.transactions.clear();
+        let user_tx = user.transactions.get_mut(&chain_id);
+        if let Some(user_transactions) = user_tx {
+            user_transactions.transactions.clear();
+        }
     });
 
     Ok(())
 }
 
-#[ic_cdk_macros::pre_upgrade]
-fn pre_upgrade() {
+pub fn pre_upgrade() {
     STATE.with(|s| {
         ic_cdk::storage::stable_save((s,)).unwrap();
     });
 }
 
-#[ic_cdk_macros::post_upgrade]
-fn post_upgrade() {
+pub fn post_upgrade() {
     let (s_prev,): (State,) = ic_cdk::storage::stable_restore().unwrap();
     STATE.with(|s| {
         *s.borrow_mut() = s_prev;
