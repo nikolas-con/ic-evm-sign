@@ -5,15 +5,154 @@ import { AuthClient } from "@dfinity/auth-client";
 import { Principal } from "@dfinity/principal";
 import {
   Box,
+  Flex,
   Button,
-  Text,
   Heading,
+  Text,
   Input,
+  Badge,
   UnorderedList,
   ListItem,
 } from "@chakra-ui/react";
 
 import { ethers } from "ethers";
+
+import {
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalFooter,
+  ModalBody,
+  ModalCloseButton,
+  useDisclosure
+} from '@chakra-ui/react'
+
+const IcLogo = ({ width = 36, height = 16 }) => {
+  return (
+    <svg viewBox="0 0 233 111" width={width} height={height}>
+      <defs>
+        <linearGradient id="grad-o-y" x1="145.304" x2="221.385" y1="7.174" y2="85.958" gradientUnits="userSpaceOnUse">
+          <stop offset=".21" stopColor="#F15A24"></stop>
+          <stop offset=".684" stopColor="#FBB03B"></stop>
+        </linearGradient>
+        <linearGradient id="grad-p-p" x1="85.087" x2="9.006" y1="101.622" y2="22.838" gradientUnits="userSpaceOnUse">
+          <stop offset=".21" stopColor="#ED1E79"></stop>
+          <stop offset=".893" stopColor="#522785"></stop>
+        </linearGradient>
+      </defs>
+      <g transform="translate(0 2)">
+        <path fill="url(#grad-o-y)" d="M174.433 0c-12.879 0-26.919 6.6-41.758 19.6-7.04 6.159-13.12 12.759-17.679 18.038l.04.04v-.04s7.199 7.84 15.159 16.24c4.28-5.08 10.44-12 17.519-18.24 13.2-11.559 21.799-13.999 26.719-13.999 18.52 0 33.559 14.68 33.559 32.719 0 17.92-15.079 32.599-33.559 32.719-.84 0-1.92-.12-3.28-.4 5.4 2.32 11.2 4 16.72 4 33.918 0 40.558-22.12 40.998-23.72 1-4.04 1.52-8.28 1.52-12.64C230.391 24.4 205.272 0 174.433 0Z"></path>
+        <path fill="url(#grad-p-p)" d="M55.958 108.796c12.88 0 26.919-6.6 41.758-19.6 7.04-6.16 13.12-12.759 17.679-18.039l-.04-.04v.04s-7.199-7.84-15.159-16.24c-4.28 5.08-10.44 12-17.52 18.24-13.199 11.56-21.798 14-26.718 14-18.52-.04-33.559-14.72-33.559-32.76C22.4 36.48 37.48 21.8 55.958 21.68c.84 0 1.92.12 3.28.4-5.4-2.32-11.2-4-16.72-4C8.6 18.08 2 40.2 1.52 41.76A52.8 52.8 0 0 0 0 54.397c0 29.999 25.119 54.398 55.958 54.398Z"></path>
+        <path fill="#29ABE2" d="M187.793 90.197c-17.36-.44-35.399-14.12-39.079-17.52-9.519-8.8-31.479-32.599-33.198-34.479C99.436 20.16 77.637 0 55.958 0h-.08C29.558.12 7.44 17.96 1.52 41.758c.44-1.56 9.12-24.119 40.958-23.319 17.36.44 35.479 14.32 39.199 17.72 9.52 8.8 31.479 32.598 33.199 34.478 16.079 18 37.878 38.159 59.557 38.159h.08c26.319-.12 48.478-17.96 54.358-41.759-.48 1.56-9.2 23.92-41.078 23.16Z"></path>
+      </g>
+    </svg>
+  )
+}
+
+const SendEthModal = ({ provider, setTransactions, setBalance, actor, chainId, address, onClose, isOpen }) => {
+  const [stage, setStage] = useState("");
+
+  const handleSignTx = async (e) => {
+    e.preventDefault();
+    console.log(typeof e.target.address.value);
+    const transaction = {
+      nonce: await provider.getTransactionCount(address),
+      gasPrice: await provider.getGasPrice().then((s) => s.toHexString()),
+      gasLimit: "0x5dc0",
+      to: e.target.address.value,
+      value: ethers.utils.parseEther(e.target.amount.value).toHexString(),
+      data: "0x000000000000000000000000000000000000000000000000000000000000000000000000",
+    };
+
+    const serializeTx = Buffer.from(
+      ethers.utils.serializeTransaction(transaction).slice(2) + "808080",
+      "hex"
+    );
+
+    setStage("signing transaction...");
+
+    const res = await actor.sign_evm_tx([...serializeTx], Number(chainId));
+
+    const signedTx = Buffer.from(res.Ok.sign_tx, "hex");
+
+    setStage("send transaction...");
+
+    const { hash } = await provider.sendTransaction(
+      "0x" + signedTx.toString("hex")
+    );
+
+    setStage("wait for verification ...");
+    await provider.waitForTransaction(hash);
+    setStage("");
+
+    const balance = await provider.getBalance(address);
+    setBalance(ethers.utils.formatEther(balance));
+    setTransactions((txs) => [...txs, { data: signedTx }]);
+  };
+
+  return (
+    <>
+      <form onSubmit={handleSignTx}>
+        <Modal isOpen={isOpen} onClose={onClose} isCentered>
+          <ModalOverlay />
+          <ModalContent>
+            <ModalHeader>Send Value</ModalHeader>
+            <ModalCloseButton />
+            <ModalBody>
+              <Flex>
+                <Input name="address" placeholder="To address" />
+                <Input name="amount" placeholder="Amount" type="number" ml="10px" width="120px" />
+              </Flex>
+              <Box>
+                <Text>{stage}</Text>
+              </Box>
+            </ModalBody>
+            <ModalFooter>
+              <Button variant='ghost' mr={3} onClick={onClose}>Close</Button>
+              <Button type="submit">Send ETH</Button>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
+      </form>
+    </>
+  )
+}
+
+const TransactionsModal = ({ onClose, isOpen, actor, transactions, setTransactions }) => {
+
+  const handleCleanTxHistory = async () => {
+    await actor.clear_caller_history();
+    setTransactions([]);
+  };
+
+  return (
+    <>
+      <form>
+        <Modal isOpen={isOpen} onClose={onClose} isCentered>
+          <ModalOverlay />
+          <ModalContent>
+            <ModalHeader>Transactions History</ModalHeader>
+            <ModalCloseButton />
+            <ModalBody>
+              <UnorderedList>
+                {transactions.map((tx, index) => (
+                  <ListItem key={index}>
+                    {ethers.utils.parseTransaction(tx.data).hash}
+                  </ListItem>
+                ))}
+              </UnorderedList>
+            </ModalBody>
+            <ModalFooter>
+              <Button variant='ghost' mr={'auto'} onClick={handleCleanTxHistory} disabled={transactions.length === 0}>Clean History</Button>
+              <Button type="submit" onClick={onClose}>Close</Button>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
+      </form>
+    </>
+  )
+}
 
 /* global BigInt */
 
@@ -23,11 +162,9 @@ const nanoseconds = BigInt(3600000000000);
 
 const BACKEND_CANISTER_ID = "rrkah-fqaaa-aaaaa-aaaaq-cai";
 const IDENTITY_CANISTER_ID = "ryjl3-tyaaa-aaaaa-aaaba-cai";
-const TO_ADDRESS = "0x7b2a3598d63256D0CE33a64ed88515dD6e76Eb2A";
 const FAUCET_ON_LOCAL_NODE = "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC";
-const RPC_URL = process.env.REACT_APP_RPC_URL
-  ? process.env.REACT_APP_RPC_URL
-  : "http://127.0.0.1:8545/";
+const RPC_URL = process.env.REACT_APP_RPC_URL ?? "http://127.0.0.1:8545/";
+
 const idleServiceOptions = (IDL) => {
   const transactions = IDL.Record({
     data: IDL.Vec(IDL.Nat8),
@@ -78,9 +215,10 @@ const App = () => {
   const [provider, setProvider] = useState(null);
   const [address, setAddress] = useState(null);
   const [balance, setBalance] = useState(null);
-  const [stage, setStage] = useState("");
   const [loggedIn, setLoggedIn] = useState(false);
   const [transactions, setTransactions] = useState([]);
+  const { isOpen: isSendOpen, onOpen: onSendOpen, onClose: onSendClose } = useDisclosure()
+  const { isOpen: isHistoryOpen, onOpen: onHistoryOpen, onClose: onHistoryClose } = useDisclosure()
 
   const onLogin = () => {
     setLoggedIn(true);
@@ -105,7 +243,7 @@ const App = () => {
       const actor = Actor.createActor(idlFactory, createActorOptions);
       setActor(actor);
     }
-  }, []);
+  }, [actor]);
 
   const initIdentity = useCallback(async () => {
     if (!authClient) {
@@ -117,22 +255,22 @@ const App = () => {
       const _authClient = await AuthClient.create({ idleOptions });
       setAuthClient(_authClient);
     }
-  }, []);
+  }, [authClient, logout]);
 
-  const intiEth = useCallback(async () => {
+  const intEth = useCallback(async () => {
     const rpcProvider = new ethers.providers.JsonRpcProvider(RPC_URL);
     if (!provider) {
       setProvider(rpcProvider);
       const { chainId } = await rpcProvider.getNetwork();
       setChainId(chainId);
     }
-  }, []);
+  }, [provider]);
 
   useEffect(() => {
     initICP();
     initIdentity();
-    intiEth();
-  }, []);
+    intEth();
+  }, [intEth, initICP, initIdentity]);
 
   const login = async () => {
     // expires in 8 days
@@ -156,44 +294,6 @@ const App = () => {
     }
   };
 
-  const handleSignTx = async (e) => {
-    e.preventDefault();
-    console.log(typeof e.target.address.value);
-    const transaction = {
-      nonce: await provider.getTransactionCount(address),
-      gasPrice: await provider.getGasPrice().then((s) => s.toHexString()),
-      gasLimit: "0x5dc0",
-      to: e.target.address.value,
-      value: ethers.utils.parseEther(e.target.amount.value).toHexString(),
-      data: "0x000000000000000000000000000000000000000000000000000000000000000000000000",
-    };
-
-    const serializeTx = Buffer.from(
-      ethers.utils.serializeTransaction(transaction).slice(2) + "808080",
-      "hex"
-    );
-
-    setStage("signing transaction...");
-
-    const res = await actor.sign_evm_tx([...serializeTx], Number(chainId));
-
-    const signedTx = Buffer.from(res.Ok.sign_tx, "hex");
-
-    setStage("send transaction...");
-
-    const { hash } = await provider.sendTransaction(
-      "0x" + signedTx.toString("hex")
-    );
-
-    setStage("wait for verification ...");
-    await provider.waitForTransaction(hash);
-    setStage("");
-
-    const balance = await provider.getBalance(address);
-    setBalance(ethers.utils.formatEther(balance));
-    setTransactions((txs) => [...txs, { data: signedTx }]);
-  };
-
   const handleTopUp = async () => {
     const signer = await provider.getSigner(FAUCET_ON_LOCAL_NODE);
 
@@ -214,65 +314,48 @@ const App = () => {
     setBalance(ethers.utils.formatEther(balance));
     setAddress(address);
   };
-  const handleCleanTxHistory = async () => {
-    await actor.clear_caller_history();
-    setTransactions([]);
-  };
 
   return (
-    <Box>
-      {loggedIn ? (
-        <>
-          <Box>
-            <Button onClick={logout}>log out</Button>
-            {address && <Text>EVM Address: {address}</Text>}
-            {balance && <Text>Balance: {balance}</Text>}
-          </Box>
+    <Flex justifyContent={'center'} marginTop="240px">
+      <Flex justifyContent={'center'} flexDir="column">
+        <Heading as="h1" textAlign={'center'}>No Key Wallet</Heading>
 
-          {!address ? (
-            <Button onClick={handleCreateEVMWallet}>Create EVM Wallet</Button>
-          ) : balance === "0.0" ? (
-            <Box>
-              <Button onClick={handleTopUp}>Top up</Button>
-            </Box>
-          ) : (
+        <Flex flexDirection={"column"} alignItems={"center"} mt="40px">
+          {loggedIn ? (
             <>
-              <form onSubmit={handleSignTx}>
-                <Input name="address" placeholder="To address" />
-                <Input name="amount" placeholder="value" />
-                <Button type="submit">Send ETH</Button>
-              </form>
               <Box>
-                <Text>{stage}</Text>
+                {address && <Text><Badge>Address:</Badge> {address.slice(0, 8)}...{address.slice(-6)}</Text>}
+                {balance && <Text><Badge>Balance:</Badge> {parseFloat(balance).toFixed(3)}</Text>}
               </Box>
-              <Box>
-                <Text>Transactions History</Text>
-                {transactions.length > 0 && (
-                  <Button onClick={handleCleanTxHistory}>
-                    Clean Transaction History
-                  </Button>
-                )}
+              <br />
 
-                <UnorderedList>
-                  {transactions.map((tx, index) => (
-                    <ListItem key={index}>
-                      {ethers.utils.parseTransaction(tx.data).hash}
-                    </ListItem>
-                  ))}
-                </UnorderedList>
-              </Box>
+              {!address ? (
+                <Button onClick={handleCreateEVMWallet}>Create EVM Wallet</Button>
+              ) : balance === "0.0" ? (
+                <Box>
+                  <Button onClick={handleTopUp}>Top up</Button>
+                </Box>
+              ) : (
+                <>
+                  <Box>
+                    <Button onClick={onHistoryOpen}>History</Button>
+                    <Button ml="8px" onClick={onSendOpen}>Transfer</Button>
+                    <Button ml="8px" onClick={logout}>Logout</Button>
+                  </Box>
+
+                  <SendEthModal provider={provider} setTransactions={setTransactions} setBalance={setBalance} actor={actor} chainId={chainId} address={address} isOpen={isSendOpen} onClose={onSendClose} />
+                  <TransactionsModal actor={actor} setTransactions={setTransactions} transactions={transactions} isOpen={isHistoryOpen} onClose={onHistoryClose} />
+                </>
+              )}
             </>
+          ) : (
+            <Button onClick={login} rightIcon={<IcLogo />}>
+              Login with
+            </Button>
           )}
-        </>
-      ) : (
-        <Box>
-          <Heading as="h1">Not authenticated</Heading>
-          <Button colorScheme="blue" onClick={login}>
-            Log in
-          </Button>
-        </Box>
-      )}
-    </Box>
+        </Flex>
+      </Flex>
+    </Flex>
   );
 };
 
