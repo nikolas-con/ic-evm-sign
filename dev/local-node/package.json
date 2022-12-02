@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "",
   "scripts": {
-    "start-node": "npx hardhat node"
+    "start": "npx hardhat node"
   },
   "keywords": [],
   "author": "",
