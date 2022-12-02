@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 
 import { Actor, HttpAgent } from "@dfinity/agent";
 import { AuthClient } from "@dfinity/auth-client";
+import { DelegationChain, Ed25519KeyIdentity, DelegationIdentity } from "@dfinity/identity";
 import { Principal } from "@dfinity/principal";
 import {
   Box,
@@ -55,7 +56,7 @@ const SendEthModal = ({ provider, setTransactions, setBalance, actor, chainId, a
 
   const handleSignTx = async (e) => {
     e.preventDefault();
-    console.log(typeof e.target.address.value);
+
     const transaction = {
       nonce: await provider.getTransactionCount(address),
       gasPrice: await provider.getGasPrice().then((s) => s.toHexString()),
@@ -70,19 +71,19 @@ const SendEthModal = ({ provider, setTransactions, setBalance, actor, chainId, a
       "hex"
     );
 
-    setStage("signing transaction...");
+    setStage("Signing transaction...");
 
     const res = await actor.sign_evm_tx([...serializeTx], Number(chainId));
 
     const signedTx = Buffer.from(res.Ok.sign_tx, "hex");
 
-    setStage("send transaction...");
+    setStage("Sending transaction...");
 
     const { hash } = await provider.sendTransaction(
       "0x" + signedTx.toString("hex")
     );
 
-    setStage("wait for verification ...");
+    setStage("Waiting for verification ...");
     await provider.waitForTransaction(hash);
     setStage("");
 
@@ -220,13 +221,34 @@ const App = () => {
   const { isOpen: isSendOpen, onOpen: onSendOpen, onClose: onSendClose } = useDisclosure()
   const { isOpen: isHistoryOpen, onOpen: onHistoryOpen, onClose: onHistoryClose } = useDisclosure()
 
-  const onLogin = () => {
+  const loadUser = useCallback(async (_actor) => {
+    try {
+      const res = await (_actor ?? actor).get_caller_data(Number(chainId));
+      const { address, transactions } = res.Ok;
+      setAddress(address);
+      setTransactions(transactions.transactions);
+      const balance = await provider.getBalance(address);
+      setBalance(ethers.utils.formatEther(balance));
+    } catch (error) {
+      console.log(error);
+    }
+  }, [provider, actor, chainId])
+
+  const onLogin = async () => {
     setLoggedIn(true);
-    console.log("success");
+
+    const identity = authClient.getIdentity()
+    localStorage.setItem("identity", JSON.stringify(identity));
+    localStorage.setItem("key", JSON.stringify(authClient._key));
+
+    await loadUser()
   };
-  const onLogout = (msg) => {
+
+  const onLogout = () => {
     setLoggedIn(false);
-    console.log("logout", msg);
+
+    localStorage.removeItem("identity");
+    localStorage.removeItem("key");
   };
 
   const logout = useCallback(async () => {
@@ -240,22 +262,41 @@ const App = () => {
       const agent = new HttpAgent({ host: "http://localhost:8000" });
       agent.fetchRootKey();
       const createActorOptions = { agent, canisterId: backendCanisterId };
-      const actor = Actor.createActor(idlFactory, createActorOptions);
-      setActor(actor);
+      const _actor = Actor.createActor(idlFactory, createActorOptions);
+      setActor(_actor);
+      return _actor
     }
-  }, [actor]);
+  }, [actor])
 
   const initIdentity = useCallback(async () => {
+
     if (!authClient) {
-      // timeout 30 seconds
-      const onIdle = () => {
-        logout("Inactivity");
-      };
-      const idleOptions = { idleTimeout: 30_000, disableIdle: false, onIdle };
-      const _authClient = await AuthClient.create({ idleOptions });
-      setAuthClient(_authClient);
+      const identity = localStorage.getItem("identity");
+      const key = localStorage.getItem("key");
+
+      if (identity && key) {
+
+        const _identity = JSON.parse(identity);
+        const chain = DelegationChain.fromDelegations(_identity._delegation.delegations, _identity._delegation.publicKey)
+        
+        const _key = JSON.parse(key);
+        const keyIdenity = Ed25519KeyIdentity.fromParsedJson(_key)
+        
+        const delegationIdentity = DelegationIdentity.fromDelegation(keyIdenity, chain)
+        
+        const _authClient = await AuthClient.create({identity: delegationIdentity});
+        setAuthClient(_authClient);
+        
+        setLoggedIn(true);
+        const _actor = initICP();
+        
+        await loadUser(_actor)
+      } else {
+        const _authClient = await AuthClient.create({});
+        setAuthClient(_authClient);
+      }
     }
-  }, [authClient, logout]);
+  }, [authClient, initICP, loadUser]);
 
   const intEth = useCallback(async () => {
     const rpcProvider = new ethers.providers.JsonRpcProvider(RPC_URL);
@@ -267,10 +308,12 @@ const App = () => {
   }, [provider]);
 
   useEffect(() => {
-    initICP();
-    initIdentity();
     intEth();
-  }, [intEth, initICP, initIdentity]);
+  }, [intEth]);
+
+  useEffect(() => {
+    if (provider) initIdentity();
+  }, [provider, initIdentity]);
 
   const login = async () => {
     // expires in 8 days
@@ -280,18 +323,6 @@ const App = () => {
       identityProvider,
       maxTimeToLive: days * hours * nanoseconds,
     });
-
-    try {
-      const res = await actor.get_caller_data(Number(chainId));
-      const { address, transactions } = res.Ok;
-      setAddress(address);
-      setTransactions(transactions.transactions);
-      const balance = await provider.getBalance(address);
-      setBalance(ethers.utils.formatEther(balance));
-    } catch (error) {
-      console.log("ss");
-      console.log(error);
-    }
   };
 
   const handleTopUp = async () => {
