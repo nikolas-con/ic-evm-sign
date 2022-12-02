@@ -5,11 +5,9 @@ edition = "2021"
 
 [dependencies]
 ic-cdk = "0.5.2"
-ic-cdk-macros = "0.5.2"
 candid = "0.7.14"
 serde = "1"
 ethereum-rlp = "0.2.3"
 easy-hasher = "2.2.1"
 libsecp256k1 = "0.6.0"
 futures = "0.3.25"
-getrandom = { version = "0.2.8", features = ["js"] }
