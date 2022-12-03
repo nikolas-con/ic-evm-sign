@@ -354,47 +354,48 @@ const App = () => {
   };
 
   return (
-    <Flex justifyContent={'center'} marginTop="200px">
-      <Box borderWidth='1px' borderRadius='lg' overflow='hidden' padding="16px">
-        <Flex justifyContent={'center'} flexDir="column">
+    <Flex justifyContent={'center'} marginTop="20%">
+      <Box minW="sm" minH="xs" borderWidth='1px' borderRadius='lg' overflow='hidden' padding="16px">
+        <Flex justifyContent={'center'} flexDir="column" h="100%">
           <Heading as="h2" size="lg" mt="16px" textAlign={'center'}>No Key Wallet</Heading>
 
-          <Flex flexDirection={"column"} alignItems={"center"} mt="40px">
+          <Flex flexDirection={"column"} alignItems={"center"} h="100%">
+            
+            <Box mt="auto">
             {loggedIn ? (
-              <>
+              <Box>
+
+                {!address && (
+                  <Button onClick={handleCreateEVMWallet}>Create EVM Wallet</Button>
+                )}
+
                 <Box mb="40px">
                   {balance && <Text textAlign="center" fontSize="3xl">{parseFloat(balance).toFixed(3)} <Box as="span" fontSize="20px">ETH</Box></Text>}
                 </Box>
                 <Box mb="12px">
                   {address && <Text><Badge>Address:</Badge> {address.slice(0, 8)}...{address.slice(-6)}</Text>}
                 </Box>
-                <br />
-
-                {!address ? (
-                  <Button onClick={handleCreateEVMWallet}>Create EVM Wallet</Button>
-                ) : balance === "0.0" ? (
-                  <Box>
-                    <Button onClick={handleTopUp}>Top up</Button>
-                  </Box>
-                ) : (
-                  <>
-                    <Divider mb="16px" />
-                    <Box>
-                      <Button variant="ghost" onClick={onHistoryOpen} leftIcon={<HiClock />}>History</Button>
-                      <Button ml="8px" onClick={onSendOpen} leftIcon={<HiPlusCircle />}>Transfer</Button>
-                      <Button variant="ghost" ml="8px" onClick={logout} leftIcon={<HiArrowLeftCircle />}>Logout</Button>
-                    </Box>
-
-                    <SendEthModal provider={provider} setTransactions={setTransactions} setBalance={setBalance} actor={actor} chainId={chainId} address={address} isOpen={isSendOpen} onClose={onSendClose} />
-                    <TransactionsModal chainId={chainId} actor={actor} setTransactions={setTransactions} transactions={transactions} isOpen={isHistoryOpen} onClose={onHistoryClose} />
-                  </>
-                )}
-              </>
+              </Box>
             ) : (
               <Button onClick={login} rightIcon={<IcLogo />}>
                 Login with
               </Button>
             )}
+            </Box>
+
+            {/* <Box>
+              <Button onClick={handleTopUp}>Top up</Button>
+            </Box> */}
+
+            <Divider mb="16px" mt="auto"/>
+            <Box>
+              <Button variant="ghost" onClick={onHistoryOpen} leftIcon={<HiClock />} disabled={!loggedIn}>History</Button>
+              <Button ml="8px" onClick={onSendOpen} leftIcon={<HiPlusCircle />} disabled={!loggedIn}>Transfer</Button>
+              <Button variant="ghost" ml="8px" onClick={logout} leftIcon={<HiArrowLeftCircle />} disabled={!loggedIn}>Logout</Button>
+            </Box>
+
+            <SendEthModal provider={provider} setTransactions={setTransactions} setBalance={setBalance} actor={actor} chainId={chainId} address={address} isOpen={isSendOpen} onClose={onSendClose} />
+            <TransactionsModal chainId={chainId} actor={actor} setTransactions={setTransactions} transactions={transactions} isOpen={isHistoryOpen} onClose={onHistoryClose} />
           </Flex>
         </Flex>
       </Box>
