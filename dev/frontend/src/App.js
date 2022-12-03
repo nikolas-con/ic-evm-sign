@@ -354,7 +354,7 @@ const App = () => {
   };
 
   return (
-    <Flex justifyContent={'center'} marginTop="20%">
+    <Flex justifyContent={'center'} margin="auto">
       <Box minW="sm" minH="xs" borderWidth='1px' borderRadius='lg' overflow='hidden' padding="16px">
         <Flex justifyContent={'center'} flexDir="column" h="100%">
           <Heading as="h2" size="lg" mt="16px" textAlign={'center'}>No Key Wallet</Heading>
