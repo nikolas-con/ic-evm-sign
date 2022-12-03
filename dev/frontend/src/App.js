@@ -12,8 +12,6 @@ import {
   Text,
   Input,
   Badge,
-  UnorderedList,
-  ListItem,
   Divider,
   useToast
 } from "@chakra-ui/react";
@@ -32,6 +30,16 @@ import {
 } from '@chakra-ui/react'
 
 import { HiClock, HiPlusCircle, HiArrowLeftCircle, HiArrowDownOnSquareStack } from "react-icons/hi2";
+
+import {
+  Table,
+  Thead,
+  Tbody,
+  Tr,
+  Th,
+  Td,
+  TableContainer,
+} from '@chakra-ui/react'
 
 const IcLogo = ({ width = 36, height = 16 }) => {
   return (
@@ -77,13 +85,13 @@ const SendEthModal = ({ provider, setTransactions, setBalance, actor, chainId, a
       "hex"
     );
 
-    toast({ title: "Signing transaction..." });
+    toast({ title: "Signing transaction...", variant: "subtle" });
 
     const res = await actor.sign_evm_tx([...serializeTx], Number(chainId));
 
     const signedTx = Buffer.from(res.Ok.sign_tx, "hex");
 
-    toast({ title: "Sending transaction..." });
+    toast({ title: "Sending transaction...", variant: "subtle" });
 
     const { hash } = await provider.sendTransaction(
       "0x" + signedTx.toString("hex")
@@ -94,7 +102,7 @@ const SendEthModal = ({ provider, setTransactions, setBalance, actor, chainId, a
 
     const balance = await provider.getBalance(address);
     setBalance(ethers.utils.formatEther(balance));
-    setTransactions((txs) => [...txs, { data: signedTx }]);
+    setTransactions((txs) => [...txs, { data: signedTx, timestamp: (+new Date()) * 1000 }]);
   };
 
   return (
@@ -124,9 +132,17 @@ const SendEthModal = ({ provider, setTransactions, setBalance, actor, chainId, a
 
 const TransactionsModal = ({ onClose, isOpen, actor, transactions, setTransactions, chainId }) => {
 
-  const handleCleanTxHistory = async () => {
+  const toast = useToast()
+
+  const handleClearTxHistory = async () => {
+
+    toast({ title: "Clearing history...", variant: "subtle" });
+    onClose()
+
     await actor.clear_caller_history(Number(chainId));
     setTransactions([]);
+
+    toast({ title: "History cleared" });
   };
 
   return (
@@ -139,16 +155,30 @@ const TransactionsModal = ({ onClose, isOpen, actor, transactions, setTransactio
             <ModalCloseButton />
             <ModalBody>
               {transactions.length > 0 ?
-                <UnorderedList>
-                  {transactions.map((tx, index) => (
-                    <ListItem key={index}>
-                      {ethers.utils.parseTransaction(tx.data).hash}
-                    </ListItem>
-                  ))}
-                </UnorderedList> : 'No transactions yet'}
+                <TableContainer>
+                  <Table variant='simple'>
+                    <Thead>
+                      <Tr>
+                        <Th>Type</Th>
+                        <Th>Timestamp</Th>
+                        <Th>Transaction Id</Th>
+                      </Tr>
+                    </Thead>
+                    <Tbody>
+                      {transactions.map((tx, index) => (
+                        <Tr key={index}>
+                          <Td><Badge colorScheme="orange">{ethers.utils.parseTransaction(tx.data).type ?? 'Legacy'}</Badge></Td>
+                          <Td>{(new Date(tx.timestamp / 1000)).toLocaleString()}</Td>
+                          <Td>{ethers.utils.parseTransaction(tx.data).hash}</Td>
+                        </Tr>
+                      ))}
+                    </Tbody>
+                  </Table>
+                </TableContainer> : 
+                'No transactions yet'}
             </ModalBody>
             <ModalFooter>
-              <Button variant='ghost' mr={'auto'} onClick={handleCleanTxHistory} disabled={transactions.length === 0}>Clean History</Button>
+              <Button variant='ghost' mr={'auto'} onClick={handleClearTxHistory} disabled={transactions.length === 0}>Clear History</Button>
               <Button type="submit" onClick={onClose}>Close</Button>
             </ModalFooter>
           </ModalContent>
@@ -158,16 +188,14 @@ const TransactionsModal = ({ onClose, isOpen, actor, transactions, setTransactio
   )
 }
 
-/* global BigInt */
+// internet computer
+const IC_URL = "http://localhost:8000";
+const BACKEND_CANISTER_ID = process.env.REACT_APP_BACKEND_CANISTER_ID ?? "rrkah-fqaaa-aaaaa-aaaaq-cai";
+const IDENTITY_CANISTER_ID = process.env.REACT_APP_IDENTITY_CANISTER_ID ?? "ryjl3-tyaaa-aaaaa-aaaba-cai";
 
-const days = BigInt(1);
-const hours = BigInt(24);
-const nanoseconds = BigInt(3600000000000);
-
-const BACKEND_CANISTER_ID = "rrkah-fqaaa-aaaaa-aaaaq-cai";
-const IDENTITY_CANISTER_ID = "ryjl3-tyaaa-aaaaa-aaaba-cai";
+// evm chain
 const FAUCET_ON_LOCAL_NODE = "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC";
-const RPC_URL = process.env.REACT_APP_RPC_URL ?? "http://127.0.0.1:8545/";
+const RPC_URL = process.env.REACT_APP_RPC_URL ?? "http://localhost:8545/";
 
 const idleServiceOptions = (IDL) => {
   const transactions = IDL.Record({
@@ -217,6 +245,9 @@ const idleServiceOptions = (IDL) => {
 const idlFactory = ({ IDL }) => IDL.Service(idleServiceOptions(IDL));
 
 const App = () => {
+
+  const toast = useToast()
+
   const [actor, setActor] = useState(null);
   const [chainId, setChainId] = useState(null);
   const [authClient, setAuthClient] = useState(null);
@@ -248,7 +279,8 @@ const App = () => {
     localStorage.setItem("identity", JSON.stringify(identity));
     localStorage.setItem("key", JSON.stringify(authClient._key));
 
-    await loadUser()
+    const _actor = initICP();
+    await loadUser(_actor)
   };
 
   const onLogout = () => {
@@ -266,7 +298,7 @@ const App = () => {
   const initICP = useCallback(() => {
     if (!actor) {
       const backendCanisterId = Principal.fromText(BACKEND_CANISTER_ID);
-      const agent = new HttpAgent({ host: "http://localhost:8000" });
+      const agent = new HttpAgent({ host: IC_URL });
       agent.fetchRootKey();
       const createActorOptions = { agent, canisterId: backendCanisterId };
       const _actor = Actor.createActor(idlFactory, createActorOptions);
@@ -324,11 +356,12 @@ const App = () => {
 
   const login = async () => {
     // expires in 8 days
-    const identityProvider = `http://localhost:8000?canisterId=${IDENTITY_CANISTER_ID}`;
+    const identityProvider = `${IC_URL}?canisterId=${IDENTITY_CANISTER_ID}`;
+    const maxTimeToLive = 24n * 60n * 60n * 1000n * 1000n
     authClient.login({
       onSuccess: onLogin,
       identityProvider,
-      maxTimeToLive: days * hours * nanoseconds,
+      maxTimeToLive,
     });
   };
 
@@ -347,7 +380,13 @@ const App = () => {
   };
 
   const handleCreateEVMWallet = async () => {
+
+    toast({ title: "Creating wallet...", variant: "subtle" });
+
     const res = await actor.create();
+
+    toast({ title: "New wallet created" });
+
     const { address } = res.Ok;
     const balance = await provider.getBalance(address);
     setBalance(ethers.utils.formatEther(balance));
