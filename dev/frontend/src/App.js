@@ -29,7 +29,7 @@ import {
   useDisclosure
 } from '@chakra-ui/react'
 
-import { HiClock, HiPlusCircle, HiArrowLeftCircle, HiArrowDownOnSquareStack } from "react-icons/hi2";
+import { HiClock, HiPlusCircle, HiArrowLeftCircle, HiArrowDownOnSquareStack, HiCog6Tooth } from "react-icons/hi2";
 
 import {
   Table,
@@ -40,6 +40,8 @@ import {
   Td,
   TableContainer,
 } from '@chakra-ui/react'
+
+import networks from "./networks"
 
 const timeSinceShort = (date) => {
 
@@ -80,7 +82,7 @@ const IcLogo = ({ width = 36, height = 16 }) => {
   )
 }
 
-const SendEthModal = ({ provider, setTransactions, setBalance, actor, chainId, address, onClose, isOpen }) => {
+const SendFundsModal = ({ provider, network, setTransactions, setBalance, actor, chainId, address, onClose, isOpen }) => {
   const [amount, setAmount] = useState("");
   const [destination, setDestination] = useState("");
   const toast = useToast()
@@ -115,7 +117,7 @@ const SendEthModal = ({ provider, setTransactions, setBalance, actor, chainId, a
     );
 
     await provider.waitForTransaction(hash);
-    toast({ title: `Transfered ${amount} ETH` });
+    toast({ title: `Transfered ${amount} ${network.nativeCurrency.symbol}` });
 
     const balance = await provider.getBalance(address);
     setBalance(ethers.utils.formatEther(balance));
@@ -197,15 +199,16 @@ const TransactionsModal = ({ onClose, isOpen, actor, transactions, setTransactio
   )
 }
 
-const networks = [{ name: 'Ethereum Mainnet', short: 'Ethereum' }, { name: 'Binance Smart Chain', short: 'BSC' }]
+const networkIndex = localStorage.getItem("network") ?? 0
 
-const NetworkModal = ({ onClose, isOpen }) => {
+const NetworkModal = ({ onClose, isOpen, setNetwork }) => {
 
   const selectNetwork = (i) => {
-    // alert(networks[i])
+    setNetwork(networks[i])
     onClose()
+    localStorage.setItem("network", i);
   }
-  
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} isCentered size="xs">
       <ModalOverlay />
@@ -286,6 +289,7 @@ const App = () => {
   const [provider, setProvider] = useState(null);
   const [address, setAddress] = useState(null);
   const [balance, setBalance] = useState(null);
+  const [network, setNetwork] = useState(networks[networkIndex]);
   const [loggedIn, setLoggedIn] = useState(false);
   const [transactions, setTransactions] = useState([]);
   const { isOpen: isSendOpen, onOpen: onSendOpen, onClose: onSendClose } = useDisclosure()
@@ -371,7 +375,7 @@ const App = () => {
     }
   }, [authClient, initICP, loadUser]);
 
-  const intEth = useCallback(async () => {
+  const intProvider = useCallback(async () => {
     const rpcProvider = new ethers.providers.JsonRpcProvider(RPC_URL);
     if (!provider) {
       setProvider(rpcProvider);
@@ -381,8 +385,8 @@ const App = () => {
   }, [provider]);
 
   useEffect(() => {
-    intEth();
-  }, [intEth]);
+    intProvider();
+  }, [intProvider]);
 
   useEffect(() => {
     if (provider) initIdentity();
@@ -434,8 +438,8 @@ const App = () => {
           <Heading as="h2" size="lg" mt="16px" textAlign={'center'}>No Key Wallet</Heading>
 
           <Flex justifyContent="center" mt="20px">
-            <Button leftIcon={<HiClock />} size="xs" variant='solid' onClick={onNetworkOpen}>
-              {networks[0].short}
+            <Button rightIcon={<HiCog6Tooth />} size="xs" variant='solid' onClick={onNetworkOpen}>
+              {network?.name.split(' ')[0]}
             </Button>
           </Flex>
 
@@ -450,7 +454,7 @@ const App = () => {
                   )}
 
                   <Box mb="40px">
-                    {balance && <Text textAlign="center" fontSize="3xl">{parseFloat(balance).toFixed(3)} <Box as="span" fontSize="20px">ETH</Box></Text>}
+                    {balance && <Text textAlign="center" fontSize="3xl">{parseFloat(balance).toPrecision(3)} <Box as="span" fontSize="20px">{network.nativeCurrency.symbol}</Box></Text>}
                   </Box>
                   <Box mb="12px">
                     {address && <Text><Badge>Address:</Badge> {address.slice(0, 8)}...{address.slice(-6)}</Text>}
@@ -473,9 +477,9 @@ const App = () => {
               <Button variant="ghost" ml="8px" onClick={logout} leftIcon={<HiArrowLeftCircle />} disabled={!loggedIn}>Logout</Button>
             </Box>
 
-            <SendEthModal provider={provider} setTransactions={setTransactions} setBalance={setBalance} actor={actor} chainId={chainId} address={address} isOpen={isSendOpen} onClose={onSendClose} />
+            <SendFundsModal network={network} provider={provider} setTransactions={setTransactions} setBalance={setBalance} actor={actor} chainId={chainId} address={address} isOpen={isSendOpen} onClose={onSendClose} />
             <TransactionsModal chainId={chainId} actor={actor} setTransactions={setTransactions} transactions={transactions} isOpen={isHistoryOpen} onClose={onHistoryClose} />
-            <NetworkModal isOpen={isNetworkOpen} onClose={onNetworkClose} />
+            <NetworkModal setNetwork={setNetwork} isOpen={isNetworkOpen} onClose={onNetworkClose} />
           </Flex>
         </Flex>
       </Box>
