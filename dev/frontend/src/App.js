@@ -41,6 +41,23 @@ import {
   TableContainer,
 } from '@chakra-ui/react'
 
+const timeSinceShort = (date) => {
+    
+  const m = date.toLocaleString('default', { month: 'short' })
+  const y = date.getYear()
+
+  const s = Math.floor((new Date() - date) / 1000)
+  let i = s / 31536000
+  if (i > 1) {return `${m} ${y}`}
+  i = s / 86400
+  if (i > 1) {const x = Math.floor(i); return `${x}d ago`}
+  i = s / 3600
+  if (i > 1) {const x = Math.floor(i); return `${x}h ago`}
+  i = s / 60
+  if (i > 1) {const x = Math.floor(i); return `${x}m ago`}
+  return `now`
+}
+
 const IcLogo = ({ width = 36, height = 16 }) => {
   return (
     <svg viewBox="0 0 233 111" width={width} height={height}>
@@ -108,7 +125,7 @@ const SendEthModal = ({ provider, setTransactions, setBalance, actor, chainId, a
   return (
     <>
       <form>
-        <Modal isOpen={isOpen} onClose={onClose} isCentered>
+        <Modal isOpen={isOpen} onClose={onClose} isCentered size="lg">
           <ModalOverlay />
           <ModalContent>
             <ModalHeader>Transfer Funds</ModalHeader>
@@ -148,7 +165,7 @@ const TransactionsModal = ({ onClose, isOpen, actor, transactions, setTransactio
   return (
     <>
       <form>
-        <Modal isOpen={isOpen} onClose={onClose} isCentered>
+        <Modal isOpen={isOpen} onClose={onClose} isCentered size="lg">
           <ModalOverlay />
           <ModalContent>
             <ModalHeader>Transaction History</ModalHeader>
@@ -159,17 +176,17 @@ const TransactionsModal = ({ onClose, isOpen, actor, transactions, setTransactio
                   <Table variant='simple'>
                     <Thead>
                       <Tr>
-                        <Th>Type</Th>
-                        <Th>Timestamp</Th>
                         <Th>Transaction Id</Th>
+                        <Th>Value</Th>
+                        <Th>Created</Th>
                       </Tr>
                     </Thead>
                     <Tbody>
                       {transactions.map((tx, index) => (
                         <Tr key={index}>
-                          <Td><Badge colorScheme="orange">{ethers.utils.parseTransaction(tx.data).type ?? 'Legacy'}</Badge></Td>
-                          <Td>{(new Date(tx.timestamp / 1000)).toLocaleString()}</Td>
-                          <Td>{ethers.utils.parseTransaction(tx.data).hash}</Td>
+                          <Td>{ethers.utils.parseTransaction(tx.data).hash.slice(0, 8)}...{ethers.utils.parseTransaction(tx.data).hash.slice(-6)}</Td>
+                          <Td>{ethers.utils.formatEther(ethers.utils.parseTransaction(tx.data).value)}</Td>
+                          <Td>{timeSinceShort(new Date(tx.timestamp / 1000))}</Td>
                         </Tr>
                       ))}
                     </Tbody>
@@ -264,6 +281,7 @@ const App = () => {
       const res = await (_actor ?? actor).get_caller_data(Number(chainId));
       const { address, transactions } = res.Ok;
       setAddress(address);
+      // console.log(res.Ok)
       setTransactions(transactions.transactions);
       const balance = await provider.getBalance(address);
       setBalance(ethers.utils.formatEther(balance));
@@ -422,10 +440,6 @@ const App = () => {
               </Button>
             )}
             </Box>
-
-            {/* <Box>
-              <Button onClick={handleTopUp}>Top up</Button>
-            </Box> */}
 
             <Divider mb="16px" mt="auto"/>
             <Box>
