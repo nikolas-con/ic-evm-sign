@@ -82,7 +82,7 @@ const IcLogo = ({ width = 36, height = 16 }) => {
   )
 }
 
-const SendFundsModal = ({ provider, network, setTransactions, setBalance, actor, chainId, address, onClose, isOpen }) => {
+const SendFundsModal = ({ provider, network, setTransactions, setBalance, actor, address, onClose, isOpen }) => {
   const [amount, setAmount] = useState("");
   const [destination, setDestination] = useState("");
   const toast = useToast()
@@ -106,7 +106,7 @@ const SendFundsModal = ({ provider, network, setTransactions, setBalance, actor,
 
     toast({ title: "Signing transaction...", variant: "subtle" });
 
-    const res = await actor.sign_evm_tx([...serializeTx], Number(chainId));
+    const res = await actor.sign_evm_tx([...serializeTx], Number(network.chainId));
 
     const signedTx = Buffer.from(res.Ok.sign_tx, "hex");
 
@@ -145,7 +145,7 @@ const SendFundsModal = ({ provider, network, setTransactions, setBalance, actor,
   )
 }
 
-const TransactionsModal = ({ onClose, isOpen, actor, transactions, setTransactions, chainId }) => {
+const TransactionsModal = ({ onClose, isOpen, actor, transactions, setTransactions, network }) => {
 
   const toast = useToast()
 
@@ -154,7 +154,7 @@ const TransactionsModal = ({ onClose, isOpen, actor, transactions, setTransactio
     toast({ title: "Clearing history...", variant: "subtle" });
     onClose()
 
-    await actor.clear_caller_history(Number(chainId));
+    await actor.clear_caller_history(Number(network.chainId));
     setTransactions([]);
 
     toast({ title: "History cleared" });
@@ -201,12 +201,17 @@ const TransactionsModal = ({ onClose, isOpen, actor, transactions, setTransactio
 
 const networkIndex = localStorage.getItem("network") ?? 0
 
-const NetworkModal = ({ onClose, isOpen, setNetwork }) => {
+const NetworkModal = ({ onClose, isOpen, setNetwork, setProvider }) => {
 
   const selectNetwork = (i) => {
+    
+    const rpcProvider = new ethers.providers.JsonRpcProvider(networks[i].rpc[0]);
+    setProvider(rpcProvider);
+
     setNetwork(networks[i])
     onClose()
     localStorage.setItem("network", i);
+
   }
 
   return (
@@ -216,7 +221,7 @@ const NetworkModal = ({ onClose, isOpen, setNetwork }) => {
         <ModalHeader>Select Network</ModalHeader>
         <ModalCloseButton />
         <ModalBody mb="12px">
-          {networks.map((n, i) => <Text onClick={() => selectNetwork(i)} _hover={{ bgColor: '#00000010', cursor: 'pointer' }} padding="8px" borderRadius="4px" textAlign="center">{n.name}</Text>)}
+          {networks.map((n, i) => <Text key={i} onClick={() => selectNetwork(i)} _hover={{ bgColor: '#00000010', cursor: 'pointer' }} padding="8px" borderRadius="4px" textAlign="center">{n.name}</Text>)}
         </ModalBody>
       </ModalContent>
     </Modal>
@@ -230,7 +235,6 @@ const IDENTITY_CANISTER_ID = process.env.REACT_APP_IDENTITY_CANISTER_ID ?? "ryjl
 
 // evm chain
 const FAUCET_ON_LOCAL_NODE = "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC";
-const RPC_URL = process.env.REACT_APP_RPC_URL ?? "http://localhost:8545/";
 
 const idleServiceOptions = (IDL) => {
   const transactions = IDL.Record({
@@ -279,12 +283,20 @@ const idleServiceOptions = (IDL) => {
 
 const idlFactory = ({ IDL }) => IDL.Service(idleServiceOptions(IDL));
 
+const getActor = () => {
+  const backendCanisterId = Principal.fromText(BACKEND_CANISTER_ID);
+  const agent = new HttpAgent({ host: IC_URL });
+  agent.fetchRootKey();
+  const createActorOptions = { agent, canisterId: backendCanisterId };
+  const _actor = Actor.createActor(idlFactory, createActorOptions);
+  return _actor
+}
+const actor = getActor()
+
 const App = () => {
 
   const toast = useToast()
 
-  const [actor, setActor] = useState(null);
-  const [chainId, setChainId] = useState(null);
   const [authClient, setAuthClient] = useState(null);
   const [provider, setProvider] = useState(null);
   const [address, setAddress] = useState(null);
@@ -296,19 +308,19 @@ const App = () => {
   const { isOpen: isHistoryOpen, onOpen: onHistoryOpen, onClose: onHistoryClose } = useDisclosure()
   const { isOpen: isNetworkOpen, onOpen: onNetworkOpen, onClose: onNetworkClose } = useDisclosure()
 
-  const loadUser = useCallback(async (_actor) => {
+  const loadUser = useCallback(async () => {
     try {
-      const res = await (_actor ?? actor).get_caller_data(Number(chainId));
+      const res = await actor.get_caller_data(Number(network.chainId));
       const { address, transactions } = res.Ok;
       setAddress(address);
-      // console.log(res.Ok)
       setTransactions(transactions.transactions);
       const balance = await provider.getBalance(address);
       setBalance(ethers.utils.formatEther(balance));
     } catch (error) {
       console.log(error);
+      toast({ title: "Error", status: 'error', variant: "subtle" });
     }
-  }, [provider, actor, chainId])
+  }, [provider, network.chainId, toast])
 
   const onLogin = async () => {
     setLoggedIn(true);
@@ -317,8 +329,7 @@ const App = () => {
     localStorage.setItem("identity", JSON.stringify(identity));
     localStorage.setItem("key", JSON.stringify(authClient._key));
 
-    const _actor = initICP();
-    await loadUser(_actor)
+    await loadUser()
   };
 
   const onLogout = () => {
@@ -332,18 +343,6 @@ const App = () => {
     await authClient.logout();
     onLogout("");
   }, [authClient]);
-
-  const initICP = useCallback(() => {
-    if (!actor) {
-      const backendCanisterId = Principal.fromText(BACKEND_CANISTER_ID);
-      const agent = new HttpAgent({ host: IC_URL });
-      agent.fetchRootKey();
-      const createActorOptions = { agent, canisterId: backendCanisterId };
-      const _actor = Actor.createActor(idlFactory, createActorOptions);
-      setActor(_actor);
-      return _actor
-    }
-  }, [actor])
 
   const initIdentity = useCallback(async () => {
 
@@ -365,28 +364,23 @@ const App = () => {
         setAuthClient(_authClient);
 
         setLoggedIn(true);
-        const _actor = initICP();
 
-        await loadUser(_actor)
+        await loadUser()
       } else {
         const _authClient = await AuthClient.create({});
         setAuthClient(_authClient);
       }
     }
-  }, [authClient, initICP, loadUser]);
+  }, [authClient, loadUser]);
 
-  const intProvider = useCallback(async () => {
-    const rpcProvider = new ethers.providers.JsonRpcProvider(RPC_URL);
-    if (!provider) {
-      setProvider(rpcProvider);
-      const { chainId } = await rpcProvider.getNetwork();
-      setChainId(chainId);
-    }
-  }, [provider]);
+  const updateProvider = useCallback(async () => {
+    const rpcProvider = new ethers.providers.JsonRpcProvider(networks[networkIndex].rpc[0]);
+    setProvider(rpcProvider);
+  }, []);
 
   useEffect(() => {
-    intProvider();
-  }, [intProvider]);
+    updateProvider();
+  }, [updateProvider]);
 
   useEffect(() => {
     if (provider) initIdentity();
@@ -477,9 +471,9 @@ const App = () => {
               <Button variant="ghost" ml="8px" onClick={logout} leftIcon={<HiArrowLeftCircle />} disabled={!loggedIn}>Logout</Button>
             </Box>
 
-            <SendFundsModal network={network} provider={provider} setTransactions={setTransactions} setBalance={setBalance} actor={actor} chainId={chainId} address={address} isOpen={isSendOpen} onClose={onSendClose} />
-            <TransactionsModal chainId={chainId} actor={actor} setTransactions={setTransactions} transactions={transactions} isOpen={isHistoryOpen} onClose={onHistoryClose} />
-            <NetworkModal setNetwork={setNetwork} isOpen={isNetworkOpen} onClose={onNetworkClose} />
+            <SendFundsModal network={network} provider={provider} setTransactions={setTransactions} setBalance={setBalance} actor={actor} address={address} isOpen={isSendOpen} onClose={onSendClose} />
+            <TransactionsModal network={network} actor={actor} setTransactions={setTransactions} transactions={transactions} isOpen={isHistoryOpen} onClose={onHistoryClose} />
+            <NetworkModal setProvider={setProvider} setNetwork={setNetwork} isOpen={isNetworkOpen} onClose={onNetworkClose} />
           </Flex>
         </Flex>
       </Box>

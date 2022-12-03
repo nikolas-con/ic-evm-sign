@@ -172,5 +172,22 @@ const networks = [{
       "standard": "EIP3091"
     }
   ]
+},
+{
+  "name": "Localhost 8545",
+  "chain": "ETH",
+  "rpc": ["http://localhost:8545/"],
+  "faucets": [],
+  "nativeCurrency": {
+    "name": "Ethereum",
+    "symbol": "ETH",
+    "decimals": 18
+  },
+  "infoURL": "",
+  "shortName": "eth",
+  "chainId": 1,
+  "networkId": 1,
+  "icon": "ethereum",
+  "explorers": []
 }]
 export default networks
