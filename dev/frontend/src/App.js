@@ -60,6 +60,22 @@ const timeSinceShort = (date) => {
   return `now`
 }
 
+const getDelegationIdentity = () => {
+  const identity = localStorage.getItem("identity");
+  const key = localStorage.getItem("key");
+
+  if (!identity || !key) return
+
+  const _identity = JSON.parse(identity);
+  const chain = DelegationChain.fromDelegations(_identity._delegation.delegations, _identity._delegation.publicKey)
+
+  const _key = JSON.parse(key);
+  const keyIdenity = Ed25519KeyIdentity.fromParsedJson(_key)
+
+  const delegationIdentity = DelegationIdentity.fromDelegation(keyIdenity, chain)
+  return delegationIdentity
+}
+
 const IcLogo = ({ width = 36, height = 16 }) => {
   return (
     <svg viewBox="0 0 233 111" width={width} height={height}>
@@ -308,19 +324,19 @@ const App = () => {
   const { isOpen: isHistoryOpen, onOpen: onHistoryOpen, onClose: onHistoryClose } = useDisclosure()
   const { isOpen: isNetworkOpen, onOpen: onNetworkOpen, onClose: onNetworkClose } = useDisclosure()
 
-  const loadUser = useCallback(async () => {
+  const loadUser = useCallback(async (_provider) => {
     try {
       const res = await actor.get_caller_data(Number(network.chainId));
       const { address, transactions } = res.Ok;
       setAddress(address);
       setTransactions(transactions.transactions);
-      const balance = await provider.getBalance(address);
+      const balance = await _provider.getBalance(address);
       setBalance(ethers.utils.formatEther(balance));
     } catch (error) {
       console.log(error);
       toast({ title: "Error", status: 'error', variant: "subtle" });
     }
-  }, [provider, network.chainId, toast])
+  }, [network.chainId, toast])
 
   const onLogin = async () => {
     setLoggedIn(true);
@@ -329,7 +345,7 @@ const App = () => {
     localStorage.setItem("identity", JSON.stringify(identity));
     localStorage.setItem("key", JSON.stringify(authClient._key));
 
-    await loadUser()
+    await loadUser(provider)
   };
 
   const onLogout = () => {
@@ -344,50 +360,28 @@ const App = () => {
     onLogout("");
   }, [authClient]);
 
-  const initIdentity = useCallback(async () => {
+  const loadProviderAndUser = useCallback(async () => {
 
-    if (!authClient) {
-      const identity = localStorage.getItem("identity");
-      const key = localStorage.getItem("key");
-
-      if (identity && key) {
-
-        const _identity = JSON.parse(identity);
-        const chain = DelegationChain.fromDelegations(_identity._delegation.delegations, _identity._delegation.publicKey)
-
-        const _key = JSON.parse(key);
-        const keyIdenity = Ed25519KeyIdentity.fromParsedJson(_key)
-
-        const delegationIdentity = DelegationIdentity.fromDelegation(keyIdenity, chain)
-
-        const _authClient = await AuthClient.create({ identity: delegationIdentity });
-        setAuthClient(_authClient);
-
-        setLoggedIn(true);
-
-        await loadUser()
-      } else {
-        const _authClient = await AuthClient.create({});
-        setAuthClient(_authClient);
-      }
-    }
-  }, [authClient, loadUser]);
-
-  const updateProvider = useCallback(async () => {
     const rpcProvider = new ethers.providers.JsonRpcProvider(networks[networkIndex].rpc[0]);
     setProvider(rpcProvider);
-  }, []);
+
+    const delegationIdentity = getDelegationIdentity()
+
+    const _authClient = await AuthClient.create({ identity: delegationIdentity });
+    setAuthClient(_authClient);
+    
+    if (delegationIdentity) {
+      setLoggedIn(true);
+
+      await loadUser(rpcProvider)
+    }
+  }, [loadUser]);
 
   useEffect(() => {
-    updateProvider();
-  }, [updateProvider]);
-
-  useEffect(() => {
-    if (provider) initIdentity();
-  }, [provider, initIdentity]);
+    loadProviderAndUser();
+  }, [loadProviderAndUser]);
 
   const login = async () => {
-    // expires in 8 days
     const identityProvider = `${IC_URL}?canisterId=${IDENTITY_CANISTER_ID}`;
     const maxTimeToLive = 24n * 60n * 60n * 1000n * 1000n
     authClient.login({
