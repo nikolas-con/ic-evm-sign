@@ -14,6 +14,8 @@ import {
   Badge,
   UnorderedList,
   ListItem,
+  Divider,
+  useToast
 } from "@chakra-ui/react";
 
 import { ethers } from "ethers";
@@ -28,6 +30,8 @@ import {
   ModalCloseButton,
   useDisclosure
 } from '@chakra-ui/react'
+
+import { HiClock, HiPlusCircle, HiArrowLeftCircle } from "react-icons/hi2";
 
 const IcLogo = ({ width = 36, height = 16 }) => {
   return (
@@ -52,40 +56,41 @@ const IcLogo = ({ width = 36, height = 16 }) => {
 }
 
 const SendEthModal = ({ provider, setTransactions, setBalance, actor, chainId, address, onClose, isOpen }) => {
-  const [stage, setStage] = useState("");
+  const [amount, setAmount] = useState("");
+  const [destination, setDestination] = useState("");
+  const toast = useToast()
 
   const handleSignTx = async (e) => {
     e.preventDefault();
 
-    const transaction = {
-      nonce: await provider.getTransactionCount(address),
-      gasPrice: await provider.getGasPrice().then((s) => s.toHexString()),
-      gasLimit: "0x5dc0",
-      to: e.target.address.value,
-      value: ethers.utils.parseEther(e.target.amount.value).toHexString(),
-      data: "0x000000000000000000000000000000000000000000000000000000000000000000000000",
-    };
+    onClose()
+
+    const nonce = await provider.getTransactionCount(address)
+    const gasPrice = await provider.getGasPrice().then((s) => s.toHexString())
+    const value = ethers.utils.parseEther(amount).toHexString()
+    const data = "0x000000000000000000000000000000000000000000000000000000000000000000000000"
+    const gasLimit = "0x5dc0"
+    const transaction = { nonce, gasPrice, gasLimit, to: destination, value, data, };
 
     const serializeTx = Buffer.from(
       ethers.utils.serializeTransaction(transaction).slice(2) + "808080",
       "hex"
     );
 
-    setStage("Signing transaction...");
+    toast({ title: "Signing transaction..." });
 
     const res = await actor.sign_evm_tx([...serializeTx], Number(chainId));
 
     const signedTx = Buffer.from(res.Ok.sign_tx, "hex");
 
-    setStage("Sending transaction...");
+    toast({ title: "Sending transaction..." });
 
     const { hash } = await provider.sendTransaction(
       "0x" + signedTx.toString("hex")
     );
 
-    setStage("Waiting for verification ...");
     await provider.waitForTransaction(hash);
-    setStage("");
+    toast({ title: `Transfered ${amount} ETH` });
 
     const balance = await provider.getBalance(address);
     setBalance(ethers.utils.formatEther(balance));
@@ -94,24 +99,21 @@ const SendEthModal = ({ provider, setTransactions, setBalance, actor, chainId, a
 
   return (
     <>
-      <form onSubmit={handleSignTx}>
+      <form>
         <Modal isOpen={isOpen} onClose={onClose} isCentered>
           <ModalOverlay />
           <ModalContent>
-            <ModalHeader>Send Value</ModalHeader>
+            <ModalHeader>Transfer Funds</ModalHeader>
             <ModalCloseButton />
             <ModalBody>
               <Flex>
-                <Input name="address" placeholder="To address" />
-                <Input name="amount" placeholder="Amount" type="number" ml="10px" width="120px" />
+                <Input onChange={e => setDestination(e.target.value)} placeholder="Destination (Address)" />
+                <Input onChange={e => setAmount(e.target.value)} placeholder="Amount" type="number" ml="10px" width="120px" />
               </Flex>
-              <Box>
-                <Text>{stage}</Text>
-              </Box>
             </ModalBody>
             <ModalFooter>
               <Button variant='ghost' mr={3} onClick={onClose}>Close</Button>
-              <Button type="submit">Send ETH</Button>
+              <Button onClick={handleSignTx}>Send</Button>
             </ModalFooter>
           </ModalContent>
         </Modal>
@@ -120,10 +122,10 @@ const SendEthModal = ({ provider, setTransactions, setBalance, actor, chainId, a
   )
 }
 
-const TransactionsModal = ({ onClose, isOpen, actor, transactions, setTransactions }) => {
+const TransactionsModal = ({ onClose, isOpen, actor, transactions, setTransactions, chainId }) => {
 
   const handleCleanTxHistory = async () => {
-    await actor.clear_caller_history();
+    await actor.clear_caller_history(Number(chainId));
     setTransactions([]);
   };
 
@@ -133,16 +135,17 @@ const TransactionsModal = ({ onClose, isOpen, actor, transactions, setTransactio
         <Modal isOpen={isOpen} onClose={onClose} isCentered>
           <ModalOverlay />
           <ModalContent>
-            <ModalHeader>Transactions History</ModalHeader>
+            <ModalHeader>Transaction History</ModalHeader>
             <ModalCloseButton />
             <ModalBody>
-              <UnorderedList>
-                {transactions.map((tx, index) => (
-                  <ListItem key={index}>
-                    {ethers.utils.parseTransaction(tx.data).hash}
-                  </ListItem>
-                ))}
-              </UnorderedList>
+              {transactions.length > 0 ?
+                <UnorderedList>
+                  {transactions.map((tx, index) => (
+                    <ListItem key={index}>
+                      {ethers.utils.parseTransaction(tx.data).hash}
+                    </ListItem>
+                  ))}
+                </UnorderedList> : 'No transactions yet'}
             </ModalBody>
             <ModalFooter>
               <Button variant='ghost' mr={'auto'} onClick={handleCleanTxHistory} disabled={transactions.length === 0}>Clean History</Button>
@@ -198,7 +201,11 @@ const idleServiceOptions = (IDL) => {
       [IDL.Variant({ Ok: sign_tx_response, Err: IDL.Text })],
       ["update"]
     ),
-    clear_caller_history: IDL.Func([], [], ["update"]),
+    clear_caller_history: IDL.Func(
+      [IDL.Nat64],
+      [IDL.Variant({ Ok: IDL.Null, Err: IDL.Text })],
+      ["update"]
+    ),
     get_caller_data: IDL.Func(
       [IDL.Nat64],
       [IDL.Variant({ Ok: caller_response, Err: IDL.Text })],
@@ -278,18 +285,18 @@ const App = () => {
 
         const _identity = JSON.parse(identity);
         const chain = DelegationChain.fromDelegations(_identity._delegation.delegations, _identity._delegation.publicKey)
-        
+
         const _key = JSON.parse(key);
         const keyIdenity = Ed25519KeyIdentity.fromParsedJson(_key)
-        
+
         const delegationIdentity = DelegationIdentity.fromDelegation(keyIdenity, chain)
-        
-        const _authClient = await AuthClient.create({identity: delegationIdentity});
+
+        const _authClient = await AuthClient.create({ identity: delegationIdentity });
         setAuthClient(_authClient);
-        
+
         setLoggedIn(true);
         const _actor = initICP();
-        
+
         await loadUser(_actor)
       } else {
         const _authClient = await AuthClient.create({});
@@ -347,45 +354,50 @@ const App = () => {
   };
 
   return (
-    <Flex justifyContent={'center'} marginTop="240px">
-      <Flex justifyContent={'center'} flexDir="column">
-        <Heading as="h1" textAlign={'center'}>No Key Wallet</Heading>
+    <Flex justifyContent={'center'} marginTop="200px">
+      <Box borderWidth='1px' borderRadius='lg' overflow='hidden' padding="16px">
+        <Flex justifyContent={'center'} flexDir="column">
+          <Heading as="h2" size="lg" mt="16px" textAlign={'center'}>No Key Wallet</Heading>
 
-        <Flex flexDirection={"column"} alignItems={"center"} mt="40px">
-          {loggedIn ? (
-            <>
-              <Box>
-                {address && <Text><Badge>Address:</Badge> {address.slice(0, 8)}...{address.slice(-6)}</Text>}
-                {balance && <Text><Badge>Balance:</Badge> {parseFloat(balance).toFixed(3)}</Text>}
-              </Box>
-              <br />
-
-              {!address ? (
-                <Button onClick={handleCreateEVMWallet}>Create EVM Wallet</Button>
-              ) : balance === "0.0" ? (
-                <Box>
-                  <Button onClick={handleTopUp}>Top up</Button>
+          <Flex flexDirection={"column"} alignItems={"center"} mt="40px">
+            {loggedIn ? (
+              <>
+                <Box mb="40px">
+                  {balance && <Text textAlign="center" fontSize="3xl">{parseFloat(balance).toFixed(3)} <Box as="span" fontSize="20px">ETH</Box></Text>}
                 </Box>
-              ) : (
-                <>
-                  <Box>
-                    <Button onClick={onHistoryOpen}>History</Button>
-                    <Button ml="8px" onClick={onSendOpen}>Transfer</Button>
-                    <Button ml="8px" onClick={logout}>Logout</Button>
-                  </Box>
+                <Box mb="12px">
+                  {address && <Text><Badge>Address:</Badge> {address.slice(0, 8)}...{address.slice(-6)}</Text>}
+                </Box>
+                <br />
 
-                  <SendEthModal provider={provider} setTransactions={setTransactions} setBalance={setBalance} actor={actor} chainId={chainId} address={address} isOpen={isSendOpen} onClose={onSendClose} />
-                  <TransactionsModal actor={actor} setTransactions={setTransactions} transactions={transactions} isOpen={isHistoryOpen} onClose={onHistoryClose} />
-                </>
-              )}
-            </>
-          ) : (
-            <Button onClick={login} rightIcon={<IcLogo />}>
-              Login with
-            </Button>
-          )}
+                {!address ? (
+                  <Button onClick={handleCreateEVMWallet}>Create EVM Wallet</Button>
+                ) : balance === "0.0" ? (
+                  <Box>
+                    <Button onClick={handleTopUp}>Top up</Button>
+                  </Box>
+                ) : (
+                  <>
+                    <Divider mb="16px" />
+                    <Box>
+                      <Button variant="ghost" onClick={onHistoryOpen} leftIcon={<HiClock />}>History</Button>
+                      <Button ml="8px" onClick={onSendOpen} leftIcon={<HiPlusCircle />}>Transfer</Button>
+                      <Button variant="ghost" ml="8px" onClick={logout} leftIcon={<HiArrowLeftCircle />}>Logout</Button>
+                    </Box>
+
+                    <SendEthModal provider={provider} setTransactions={setTransactions} setBalance={setBalance} actor={actor} chainId={chainId} address={address} isOpen={isSendOpen} onClose={onSendClose} />
+                    <TransactionsModal chainId={chainId} actor={actor} setTransactions={setTransactions} transactions={transactions} isOpen={isHistoryOpen} onClose={onHistoryClose} />
+                  </>
+                )}
+              </>
+            ) : (
+              <Button onClick={login} rightIcon={<IcLogo />}>
+                Login with
+              </Button>
+            )}
+          </Flex>
         </Flex>
-      </Flex>
+      </Box>
     </Flex>
   );
 };
