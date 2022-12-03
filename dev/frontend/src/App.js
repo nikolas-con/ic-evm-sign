@@ -140,7 +140,7 @@ const SendFundsModal = ({ provider, network, setTransactions, setBalance, actor,
 
     const balance = await provider.getBalance(address);
     setBalance(ethers.utils.formatEther(balance));
-    setTransactions((txs) => [...txs, { data: signedTx, timestamp: (+new Date()) * 1000 }]);
+    setTransactions((txs) => [...txs, { data: signedTx, timestamp: new Date() }]);
   };
 
   return (
@@ -179,6 +179,14 @@ const TransactionsModal = ({ onClose, isOpen, actor, transactions, setTransactio
     toast({ title: "History cleared" });
   };
 
+  const goToExplorer = (txId) => {
+    if (network.explorers.length > 0) {
+      window.open(`${network.explorers[0].url}/tx/${txId}`, '_blank').focus()
+    } else {
+      toast({ title: "There is no explorer for this network", variant: "subtle" });
+    }
+  }
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} isCentered size="lg">
       <ModalOverlay />
@@ -199,9 +207,12 @@ const TransactionsModal = ({ onClose, isOpen, actor, transactions, setTransactio
                 <Tbody>
                   {transactions.map((tx, index) => (
                     <Tr key={index}>
-                      <Td>{ethers.utils.parseTransaction(tx.data).hash.slice(0, 8)}...{ethers.utils.parseTransaction(tx.data).hash.slice(-6)}</Td>
+                      <Td>
+                        {ethers.utils.parseTransaction(tx.data).hash.slice(0, 8)}...{ethers.utils.parseTransaction(tx.data).hash.slice(-6)}
+                        <IconButton onClick={() => goToExplorer(ethers.utils.parseTransaction(tx.data).hash)} ml="4px" fontSize="16px" size="xs" variant="ghost" icon={<HiArrowTopRightOnSquare />} />
+                      </Td>
                       <Td>{ethers.utils.formatEther(ethers.utils.parseTransaction(tx.data).value)}</Td>
-                      <Td>{timeSinceShort(new Date(tx.timestamp / 1000))}</Td>
+                      <Td>{timeSinceShort(tx.timestamp)}</Td>
                     </Tr>
                   ))}
                 </Tbody>
@@ -346,7 +357,7 @@ const App = () => {
       const res = await actor.get_caller_data(Number(network.chainId));
       const { address, transactions } = res.Ok;
       setAddress(address);
-      setTransactions(transactions.transactions);
+      setTransactions(transactions.transactions.map(tx => ({...tx, timestamp: new Date(Number(tx.timestamp / 1000n / 1000n))})));
       const balance = await _provider.getBalance(address);
       setBalance(ethers.utils.formatEther(balance));
     } catch (error) {
