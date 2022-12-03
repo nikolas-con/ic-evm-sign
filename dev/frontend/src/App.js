@@ -276,7 +276,7 @@ const BACKEND_CANISTER_ID = process.env.REACT_APP_BACKEND_CANISTER_ID ?? "rrkah-
 const IDENTITY_CANISTER_ID = process.env.REACT_APP_IDENTITY_CANISTER_ID ?? "ryjl3-tyaaa-aaaaa-aaaba-cai";
 
 // evm chain
-const FAUCET_ON_LOCAL_NODE = "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC";
+const LOCAL_SIGNER = process.env.LOCAL_SIGNER ?? "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC";
 
 const idleServiceOptions = (IDL) => {
   const transactions = IDL.Record({
@@ -420,18 +420,21 @@ const App = () => {
     });
   };
 
-  // eslint-disable-next-line
   const handleTopUp = async () => {
-    const signer = await provider.getSigner(FAUCET_ON_LOCAL_NODE);
 
-    await signer.sendTransaction({
-      value: ethers.utils.parseEther("10"),
-      to: address,
-    });
-
-    const balance = await provider.getBalance(address);
-
-    setBalance(ethers.utils.formatEther(balance));
+    const isHardhat = network.chainId === 31337
+    if (isHardhat) {
+      const signer = await provider.getSigner(LOCAL_SIGNER);
+      await signer.sendTransaction({value: ethers.utils.parseEther("10"), to: address,});
+  
+      const balance = await provider.getBalance(address);
+      setBalance(ethers.utils.formatEther(balance));
+    } else if (network.faucets.length > 0) {
+      window.open(network.faucets[0], '_blank').focus()
+    } else {
+      toast({ title: "There is no faucet for this network", variant: "subtle" });
+    }
+    
   };
 
   const handleCreateEVMWallet = async () => {
