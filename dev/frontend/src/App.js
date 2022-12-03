@@ -42,19 +42,19 @@ import {
 } from '@chakra-ui/react'
 
 const timeSinceShort = (date) => {
-    
+
   const m = date.toLocaleString('default', { month: 'short' })
   const y = date.getYear()
 
   const s = Math.floor((new Date() - date) / 1000)
   let i = s / 31536000
-  if (i > 1) {return `${m} ${y}`}
+  if (i > 1) { return `${m} ${y}` }
   i = s / 86400
-  if (i > 1) {const x = Math.floor(i); return `${x}d ago`}
+  if (i > 1) { const x = Math.floor(i); return `${x}d ago` }
   i = s / 3600
-  if (i > 1) {const x = Math.floor(i); return `${x}h ago`}
+  if (i > 1) { const x = Math.floor(i); return `${x}h ago` }
   i = s / 60
-  if (i > 1) {const x = Math.floor(i); return `${x}m ago`}
+  if (i > 1) { const x = Math.floor(i); return `${x}m ago` }
   return `now`
 }
 
@@ -123,27 +123,23 @@ const SendEthModal = ({ provider, setTransactions, setBalance, actor, chainId, a
   };
 
   return (
-    <>
-      <form>
-        <Modal isOpen={isOpen} onClose={onClose} isCentered size="lg">
-          <ModalOverlay />
-          <ModalContent>
-            <ModalHeader>Transfer Funds</ModalHeader>
-            <ModalCloseButton />
-            <ModalBody>
-              <Flex>
-                <Input onChange={e => setDestination(e.target.value)} placeholder="Destination (Address)" />
-                <Input onChange={e => setAmount(e.target.value)} placeholder="Amount" type="number" ml="10px" width="120px" />
-              </Flex>
-            </ModalBody>
-            <ModalFooter>
-              <Button variant='ghost' mr={3} onClick={onClose}>Close</Button>
-              <Button onClick={handleSignTx}>Send</Button>
-            </ModalFooter>
-          </ModalContent>
-        </Modal>
-      </form>
-    </>
+    <Modal isOpen={isOpen} onClose={onClose} isCentered size="lg">
+      <ModalOverlay />
+      <ModalContent>
+        <ModalHeader>Transfer Funds</ModalHeader>
+        <ModalCloseButton />
+        <ModalBody>
+          <Flex>
+            <Input onChange={e => setDestination(e.target.value)} placeholder="Destination (Address)" />
+            <Input onChange={e => setAmount(e.target.value)} placeholder="Amount" type="number" ml="10px" width="120px" />
+          </Flex>
+        </ModalBody>
+        <ModalFooter>
+          <Button variant='ghost' mr={3} onClick={onClose}>Close</Button>
+          <Button onClick={handleSignTx}>Send</Button>
+        </ModalFooter>
+      </ModalContent>
+    </Modal>
   )
 }
 
@@ -163,45 +159,64 @@ const TransactionsModal = ({ onClose, isOpen, actor, transactions, setTransactio
   };
 
   return (
-    <>
-      <form>
-        <Modal isOpen={isOpen} onClose={onClose} isCentered size="lg">
-          <ModalOverlay />
-          <ModalContent>
-            <ModalHeader>Transaction History</ModalHeader>
-            <ModalCloseButton />
-            <ModalBody>
-              {transactions.length > 0 ?
-                <TableContainer>
-                  <Table variant='simple'>
-                    <Thead>
-                      <Tr>
-                        <Th>Transaction Id</Th>
-                        <Th>Value</Th>
-                        <Th>Created</Th>
-                      </Tr>
-                    </Thead>
-                    <Tbody>
-                      {transactions.map((tx, index) => (
-                        <Tr key={index}>
-                          <Td>{ethers.utils.parseTransaction(tx.data).hash.slice(0, 8)}...{ethers.utils.parseTransaction(tx.data).hash.slice(-6)}</Td>
-                          <Td>{ethers.utils.formatEther(ethers.utils.parseTransaction(tx.data).value)}</Td>
-                          <Td>{timeSinceShort(new Date(tx.timestamp / 1000))}</Td>
-                        </Tr>
-                      ))}
-                    </Tbody>
-                  </Table>
-                </TableContainer> : 
-                'No transactions yet'}
-            </ModalBody>
-            <ModalFooter>
-              <Button variant='ghost' mr={'auto'} onClick={handleClearTxHistory} disabled={transactions.length === 0}>Clear History</Button>
-              <Button type="submit" onClick={onClose}>Close</Button>
-            </ModalFooter>
-          </ModalContent>
-        </Modal>
-      </form>
-    </>
+    <Modal isOpen={isOpen} onClose={onClose} isCentered size="lg">
+      <ModalOverlay />
+      <ModalContent>
+        <ModalHeader>Transaction History</ModalHeader>
+        <ModalCloseButton />
+        <ModalBody>
+          {transactions.length > 0 ?
+            <TableContainer>
+              <Table variant='simple'>
+                <Thead>
+                  <Tr>
+                    <Th>Transaction Id</Th>
+                    <Th>Value</Th>
+                    <Th>Created</Th>
+                  </Tr>
+                </Thead>
+                <Tbody>
+                  {transactions.map((tx, index) => (
+                    <Tr key={index}>
+                      <Td>{ethers.utils.parseTransaction(tx.data).hash.slice(0, 8)}...{ethers.utils.parseTransaction(tx.data).hash.slice(-6)}</Td>
+                      <Td>{ethers.utils.formatEther(ethers.utils.parseTransaction(tx.data).value)}</Td>
+                      <Td>{timeSinceShort(new Date(tx.timestamp / 1000))}</Td>
+                    </Tr>
+                  ))}
+                </Tbody>
+              </Table>
+            </TableContainer> :
+            'No transactions yet'}
+        </ModalBody>
+        <ModalFooter>
+          <Button variant='ghost' mr={'auto'} onClick={handleClearTxHistory} disabled={transactions.length === 0}>Clear History</Button>
+          <Button type="submit" onClick={onClose}>Close</Button>
+        </ModalFooter>
+      </ModalContent>
+    </Modal>
+  )
+}
+
+const networks = [{ name: 'Ethereum Mainnet', short: 'Ethereum' }, { name: 'Binance Smart Chain', short: 'BSC' }]
+
+const NetworkModal = ({ onClose, isOpen }) => {
+
+  const selectNetwork = (i) => {
+    // alert(networks[i])
+    onClose()
+  }
+  
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} isCentered size="xs">
+      <ModalOverlay />
+      <ModalContent>
+        <ModalHeader>Select Network</ModalHeader>
+        <ModalCloseButton />
+        <ModalBody mb="12px">
+          {networks.map((n, i) => <Text onClick={() => selectNetwork(i)} _hover={{ bgColor: '#00000010', cursor: 'pointer' }} padding="8px" borderRadius="4px" textAlign="center">{n.name}</Text>)}
+        </ModalBody>
+      </ModalContent>
+    </Modal>
   )
 }
 
@@ -275,6 +290,7 @@ const App = () => {
   const [transactions, setTransactions] = useState([]);
   const { isOpen: isSendOpen, onOpen: onSendOpen, onClose: onSendClose } = useDisclosure()
   const { isOpen: isHistoryOpen, onOpen: onHistoryOpen, onClose: onHistoryClose } = useDisclosure()
+  const { isOpen: isNetworkOpen, onOpen: onNetworkOpen, onClose: onNetworkClose } = useDisclosure()
 
   const loadUser = useCallback(async (_actor) => {
     try {
@@ -413,46 +429,53 @@ const App = () => {
 
   return (
     <Flex justifyContent={'center'} margin="auto">
-      <Box minW="sm" minH="xs" borderWidth='1px' borderRadius='lg' overflow='hidden' padding="16px">
+      <Box minW="sm" minH="sm" borderWidth='1px' borderRadius='lg' overflow='hidden' padding="16px">
         <Flex justifyContent={'center'} flexDir="column" h="100%">
           <Heading as="h2" size="lg" mt="16px" textAlign={'center'}>No Key Wallet</Heading>
 
+          <Flex justifyContent="center" mt="20px">
+            <Button leftIcon={<HiClock />} size="xs" variant='solid' onClick={onNetworkOpen}>
+              {networks[0].short}
+            </Button>
+          </Flex>
+
           <Flex flexDirection={"column"} alignItems={"center"} h="100%">
-            
+
             <Box mt="auto">
-            {loggedIn ? (
-              <Box>
+              {loggedIn ? (
+                <Box>
 
-                {!address && (
-                  <Button onClick={handleCreateEVMWallet}>Create EVM Wallet</Button>
-                )}
+                  {!address && (
+                    <Button onClick={handleCreateEVMWallet}>Create EVM Wallet</Button>
+                  )}
 
-                <Box mb="40px">
-                  {balance && <Text textAlign="center" fontSize="3xl">{parseFloat(balance).toFixed(3)} <Box as="span" fontSize="20px">ETH</Box></Text>}
+                  <Box mb="40px">
+                    {balance && <Text textAlign="center" fontSize="3xl">{parseFloat(balance).toFixed(3)} <Box as="span" fontSize="20px">ETH</Box></Text>}
+                  </Box>
+                  <Box mb="12px">
+                    {address && <Text><Badge>Address:</Badge> {address.slice(0, 8)}...{address.slice(-6)}</Text>}
+                  </Box>
                 </Box>
-                <Box mb="12px">
-                  {address && <Text><Badge>Address:</Badge> {address.slice(0, 8)}...{address.slice(-6)}</Text>}
-                </Box>
-              </Box>
-            ) : (
-              <Button onClick={login} rightIcon={<IcLogo />}>
-                Login with
-              </Button>
-            )}
+              ) : (
+                <Button onClick={login} rightIcon={<IcLogo />}>
+                  Login with
+                </Button>
+              )}
             </Box>
 
-            <Divider mb="16px" mt="auto"/>
+            <Divider mb="16px" mt="auto" />
             <Box>
               <Button variant="ghost" onClick={onHistoryOpen} leftIcon={<HiClock />} disabled={!loggedIn}>History</Button>
-              {balance > 0 ? 
+              {balance > 0 ?
                 <Button ml="8px" onClick={onSendOpen} leftIcon={<HiPlusCircle />} disabled={!loggedIn}>Transfer</Button> :
-                <Button onClick={handleTopUp} leftIcon={<HiArrowDownOnSquareStack/>}>Top up</Button>
+                <Button onClick={handleTopUp} leftIcon={<HiArrowDownOnSquareStack />}>Top up</Button>
               }
               <Button variant="ghost" ml="8px" onClick={logout} leftIcon={<HiArrowLeftCircle />} disabled={!loggedIn}>Logout</Button>
             </Box>
 
             <SendEthModal provider={provider} setTransactions={setTransactions} setBalance={setBalance} actor={actor} chainId={chainId} address={address} isOpen={isSendOpen} onClose={onSendClose} />
             <TransactionsModal chainId={chainId} actor={actor} setTransactions={setTransactions} transactions={transactions} isOpen={isHistoryOpen} onClose={onHistoryClose} />
+            <NetworkModal isOpen={isNetworkOpen} onClose={onNetworkClose} />
           </Flex>
         </Flex>
       </Box>
