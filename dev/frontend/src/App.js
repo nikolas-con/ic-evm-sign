@@ -42,7 +42,9 @@ import {
   TableContainer,
 } from '@chakra-ui/react'
 
-import networks from "./networks"
+import { Tabs, TabList, TabPanels, Tab, TabPanel } from '@chakra-ui/react'
+
+import { mainnets, testnets } from "./networks"
 
 const timeSinceShort = (date) => {
 
@@ -216,15 +218,17 @@ const TransactionsModal = ({ onClose, isOpen, actor, transactions, setTransactio
   )
 }
 
-const networkIndex = localStorage.getItem("network") ?? 0
+const chainId = localStorage.getItem("chain-id") ?? 0
+const defaultNetwork = [].concat(testnets, testnets).find(r => r.chainId === +chainId) ?? mainnets[0]
 
-const NetworkModal = ({ onClose, isOpen, setNetwork, loadProviderAndUser }) => {
+const NetworkModal = ({ onClose, isOpen, setNetwork }) => {
 
-  const selectNetwork = (i) => {
+  const selectNetwork = (i, isMainnet) => {
     
-    setNetwork(networks[i])
+    const network = isMainnet ? mainnets[i] : testnets[i]
+    setNetwork(network)
     onClose()
-    localStorage.setItem("network", i);
+    localStorage.setItem("chain-id", network.chainId);
 
   }
 
@@ -235,7 +239,20 @@ const NetworkModal = ({ onClose, isOpen, setNetwork, loadProviderAndUser }) => {
         <ModalHeader>Select Network</ModalHeader>
         <ModalCloseButton />
         <ModalBody mb="12px">
-          {networks.map((n, i) => <Text key={i} onClick={() => selectNetwork(i)} _hover={{ bgColor: '#00000010', cursor: 'pointer' }} padding="8px" borderRadius="4px" textAlign="center">{n.name}</Text>)}
+          <Tabs>
+            <TabList>
+              <Tab>Mainnets</Tab>
+              <Tab>Testnets</Tab>
+            </TabList>
+            <TabPanels overflow="scroll" height="280px">
+              <TabPanel>
+                {mainnets.map((n, i) => <Text key={i} onClick={() => selectNetwork(i, true)} _hover={{ bgColor: '#00000010', cursor: 'pointer' }} padding="8px" borderRadius="4px" textAlign="center">{n.name}</Text>)}
+              </TabPanel>
+              <TabPanel>
+                {testnets.map((n, i) => <Text key={i} onClick={() => selectNetwork(i, false)} _hover={{ bgColor: '#00000010', cursor: 'pointer' }} padding="8px" borderRadius="4px" textAlign="center">{n.name}</Text>)}
+              </TabPanel>
+            </TabPanels>
+          </Tabs>
         </ModalBody>
       </ModalContent>
     </Modal>
@@ -315,7 +332,7 @@ const App = () => {
   const [provider, setProvider] = useState(null);
   const [address, setAddress] = useState(null);
   const [balance, setBalance] = useState(null);
-  const [network, setNetwork] = useState(networks[networkIndex]);
+  const [network, setNetwork] = useState(defaultNetwork);
   const [loggedIn, setLoggedIn] = useState(false);
   const [transactions, setTransactions] = useState([]);
   const { isOpen: isSendOpen, onOpen: onSendOpen, onClose: onSendClose } = useDisclosure()
@@ -426,7 +443,7 @@ const App = () => {
 
           <Flex justifyContent="center" mt="20px">
             <Button rightIcon={<HiCog6Tooth />} size="xs" variant='solid' onClick={onNetworkOpen}>
-              {network?.name.split(' ')[0]}
+              {network?.name}
             </Button>
           </Flex>
 

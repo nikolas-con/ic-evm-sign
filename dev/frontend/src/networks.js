@@ -1,6 +1,7 @@
-// const networks = [{ name: 'Ethereum Mainnet', short: 'Ethereum' }, { name: 'Binance Smart Chain', short: 'BSC' }, { name: 'Polygon', short: 'Polygon' }, { name: 'Arbitrum', short: 'Arbitrum' }, { name: 'Avalanche', short: 'Avalanche' }, { name: 'Fantom', short: 'Fantom' }]
+// https://github.com/ethereum-lists/chains/tree/master/_data
 
-const networks = [{
+const mainnets = [
+{
 	"name": "Ethereum Mainnet",
 	"chain": "ETH",
 	"icon": "ethereum",
@@ -32,7 +33,7 @@ const networks = [{
 	]
 },
 {
-  "name": "Binance Smart Chain Mainnet",
+  "name": "Binance Smart Chain",
   "chain": "BSC",
   "rpc": [
     "https://bsc-dataseed1.binance.org",
@@ -172,6 +173,203 @@ const networks = [{
       "standard": "EIP3091"
     }
   ]
+}
+]
+export { mainnets }
+
+const testnets = [
+{
+	"name": "Ethereum Sepolia",
+	"title": "Ethereum Testnet Sepolia",
+	"chain": "ETH",
+	"rpc": ["https://rpc.sepolia.org", "https://rpc-sepolia.rockx.com"],
+	"faucets": ["http://fauceth.komputing.org?chain=11155111"],
+	"nativeCurrency": {
+		"name": "Sepolia Ether",
+		"symbol": "SEP",
+		"decimals": 18
+	},
+	"infoURL": "https://sepolia.otterscan.io",
+	"shortName": "sep",
+	"chainId": 11155111,
+	"networkId": 11155111,
+	"explorers": [
+		{
+			"name": "etherscan-sepolia",
+			"url": "https://sepolia.etherscan.io",
+			"standard": "EIP3091"
+		},
+		{
+			"name": "otterscan-sepolia",
+			"url": "https://sepolia.otterscan.io",
+			"standard": "EIP3091"
+		}
+	]
+},
+{
+  "name": "Ethereum Goerli",
+  "title": "Ethereum Testnet Goerli",
+  "chain": "ETH",
+  "rpc": [
+    "https://rpc.goerli.mudit.blog/"
+  ],
+  "faucets": [
+    "http://fauceth.komputing.org?chain=5",
+    "https://goerli-faucet.slock.it",
+    "https://faucet.goerli.mudit.blog"
+  ],
+  "nativeCurrency": {
+    "name": "Goerli Ether",
+    "symbol": "ETH",
+    "decimals": 18
+  },
+  "infoURL": "https://goerli.net/#about",
+  "shortName": "gor",
+  "chainId": 5,
+  "networkId": 5,
+  "ens": {
+    "registry": "0x112234455c3a32fd11230c42e7bccd4a84e02010"
+  },
+  "explorers": [
+    {
+      "name": "etherscan-goerli",
+      "url": "https://goerli.etherscan.io",
+      "standard": "EIP3091"
+    }
+  ]
+},
+{
+  "name": "Smart Chain Testnet",
+  "chain": "BSC",
+  "rpc": [
+    "https://data-seed-prebsc-1-s1.binance.org:8545",
+    "https://data-seed-prebsc-2-s1.binance.org:8545",
+    "https://data-seed-prebsc-1-s2.binance.org:8545",
+    "https://data-seed-prebsc-2-s2.binance.org:8545",
+    "https://data-seed-prebsc-1-s3.binance.org:8545",
+    "https://data-seed-prebsc-2-s3.binance.org:8545"
+  ],
+  "faucets": ["https://testnet.binance.org/faucet-smart"],
+  "nativeCurrency": {
+    "name": "Binance Chain Native Token",
+    "symbol": "tBNB",
+    "decimals": 18
+  },
+  "infoURL": "https://testnet.binance.org/",
+  "shortName": "bnbt",
+  "chainId": 97,
+  "networkId": 97,
+  "explorers": [
+    {
+      "name": "bscscan-testnet",
+      "url": "https://testnet.bscscan.com",
+      "standard": "EIP3091"
+    }
+  ]
+},
+{
+  "name": "Polygon Mumbai",
+  "title": "Polygon Testnet Mumbai",
+  "chain": "Polygon",
+  "icon": "polygon",
+  "rpc": [
+    "https://matic-mumbai.chainstacklabs.com",
+    "https://rpc-mumbai.maticvigil.com",
+    "https://matic-testnet-archive-rpc.bwarelabs.com"
+  ],
+  "faucets": ["https://faucet.polygon.technology/"],
+  "nativeCurrency": {
+    "name": "MATIC",
+    "symbol": "MATIC",
+    "decimals": 18
+  },
+  "infoURL": "https://polygon.technology/",
+  "shortName": "maticmum",
+  "chainId": 80001,
+  "networkId": 80001,
+  "explorers": [
+    {
+      "name": "polygonscan",
+      "url": "https://mumbai.polygonscan.com",
+      "standard": "EIP3091"
+    }
+  ]
+},
+{
+  "name": "Arbitrum Nova",
+  "chainId": 42170,
+  "shortName": "arb-nova",
+  "chain": "ETH",
+  "networkId": 42170,
+  "nativeCurrency": {
+    "name": "Ether",
+    "symbol": "ETH",
+    "decimals": 18
+  },
+  "rpc": ["https://nova.arbitrum.io/rpc"],
+  "faucets": [],
+  "explorers": [
+    {
+      "name": "Arbitrum Nova Chain Explorer",
+      "url": "https://nova-explorer.arbitrum.io",
+      "icon": "blockscout",
+      "standard": "EIP3091"
+    }
+  ],
+  "infoURL": "https://arbitrum.io",
+  "parent": {
+    "type": "L2",
+    "chain": "eip155-1",
+    "bridges": [{ "url": "https://bridge.arbitrum.io" }]
+  }
+},
+{
+	"name": "Avalanche Fuji Testnet",
+	"chain": "AVAX",
+	"icon": "avax",
+	"rpc": ["https://api.avax-test.network/ext/bc/C/rpc"],
+	"faucets": ["https://faucet.avax-test.network/"],
+	"nativeCurrency": {
+		"name": "Avalanche",
+		"symbol": "AVAX",
+		"decimals": 18
+	},
+	"infoURL": "https://cchain.explorer.avax-test.network",
+	"shortName": "Fuji",
+	"chainId": 43113,
+	"networkId": 1,
+	"explorers": [
+		{
+			"name": "snowtrace",
+			"url": "https://testnet.snowtrace.io",
+			"standard": "EIP3091"
+		}
+	]
+},
+{
+  "name": "Fantom Testnet",
+  "chain": "FTM",
+  "rpc": ["https://rpc.testnet.fantom.network"],
+  "faucets": ["https://faucet.fantom.network"],
+  "nativeCurrency": {
+    "name": "Fantom",
+    "symbol": "FTM",
+    "decimals": 18
+  },
+
+  "infoURL": "https://docs.fantom.foundation/quick-start/short-guide#fantom-testnet",
+  "shortName": "tftm",
+  "chainId": 4002,
+  "networkId": 4002,
+  "icon": "fantom",
+  "explorers": [
+    {
+      "name": "ftmscan",
+      "url": "https://testnet.ftmscan.com",
+      "icon": "ftmscan",
+      "standard": "EIP3091"
+    }
+  ]
 },
 {
   "name": "Localhost 8545",
@@ -189,5 +387,6 @@ const networks = [{
   "networkId": 1337,
   "icon": "ethereum",
   "explorers": []
-}]
-export default networks
+}
+]
+export { testnets }
