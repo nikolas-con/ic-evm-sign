@@ -46,6 +46,15 @@ import { Tabs, TabList, TabPanels, Tab, TabPanel } from '@chakra-ui/react'
 
 import { mainnets, testnets } from "./networks"
 
+const getHostFromUrl = (hostUrl) => {
+  try {
+      const url = new URL(hostUrl)
+      return url.host
+  } catch (error) {
+      return ''
+  }
+}
+
 const timeSinceShort = (date) => {
 
   const m = date.toLocaleString('default', { month: 'short' })
@@ -411,7 +420,9 @@ const App = () => {
   }, [loadProviderAndUser, network]);
 
   const login = async () => {
-    const identityProvider = `${IC_URL}?canisterId=${IDENTITY_CANISTER_ID}`;
+
+    const isLocal = getHostFromUrl(IC_URL).startsWith('localhost')
+    const identityProvider = isLocal ? `${IC_URL}?canisterId=${IDENTITY_CANISTER_ID}` : "https://identity.ic0.app/#authorize";
     const maxTimeToLive = 24n * 60n * 60n * 1000n * 1000n
     authClient.login({
       onSuccess: onLogin,
@@ -515,7 +526,7 @@ const App = () => {
               <Button variant="ghost" onClick={onHistoryOpen} leftIcon={<HiClock />} disabled={!loggedIn}>History</Button>
               {balance > 0 ?
                 <Button ml="8px" onClick={onSendOpen} leftIcon={<HiPlusCircle />} disabled={!loggedIn}>Transfer</Button> :
-                <Button ml="8px" onClick={handleTopUp} leftIcon={<HiArrowDownOnSquareStack />}>Top up</Button>
+                <Button ml="8px" onClick={handleTopUp} leftIcon={<HiArrowDownOnSquareStack />} disabled={!loggedIn}>Top up</Button>
               }
               <Button variant="ghost" ml="8px" onClick={logout} leftIcon={<HiArrowLeftCircle />} disabled={!loggedIn}>Logout</Button>
             </Box>
