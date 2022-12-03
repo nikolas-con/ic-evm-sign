@@ -107,7 +107,7 @@ impl Sign for TransactionLegacy {
         Ok(keccak256.to_vec())
     }
     fn sign(&mut self, signature: Vec<u8>, public_key: Vec<u8>) -> Result<Vec<u8>, String> {
-        let chain_id = u8::try_from(self.chain_id).unwrap();
+        let chain_id = u64::try_from(self.chain_id).unwrap();
 
         let r_remove_leading_zeros = remove_leading(signature[..32].to_vec(), 0);
         let s_remove_leading_zeros = remove_leading(signature[32..].to_vec(), 0);
@@ -119,10 +119,8 @@ impl Sign for TransactionLegacy {
         let message = self.get_message_to_sign().unwrap();
         let recovery_id = find_recovery_id(&message, &signature, &public_key).unwrap();
 
-        let v = vec_u8_to_string(&vec![u8::try_from(
-            chain_id * 2 + 35 + u8::try_from(recovery_id).unwrap(),
-        )
-        .unwrap()]);
+        let v_number = chain_id * 2 + 35 + u64::try_from(recovery_id).unwrap();
+        let v = vec_u8_to_string(&u64_to_vec_u8(&v_number));
 
         self.v = v;
         self.r = r;
@@ -161,10 +159,10 @@ impl Sign for TransactionLegacy {
         if !self.is_signed() {
             return Err("This is not  a signed transaction".to_string());
         }
-        let chain_id = i8::try_from(self.chain_id).unwrap();
+        let chain_id = i64::try_from(self.chain_id).unwrap();
         let v = string_to_vec_u8(&self.v);
 
-        let recovery_id = -1 * ((chain_id * 2) + 35 - i8::try_from(v[0]).unwrap());
+        let recovery_id = -1 * ((chain_id * 2) + 35 - i64::try_from(v[0]).unwrap());
         Ok(u8::try_from(recovery_id).unwrap())
     }
     fn serialize(&self) -> Result<Vec<u8>, String> {
@@ -655,7 +653,7 @@ fn find_recovery_id(
     message: &Vec<u8>,
     signature: &Vec<u8>,
     public_key: &Vec<u8>,
-) -> Result<usize, String> {
+) -> Result<u8, String> {
     if signature.len() != 64 {
         return Err("Invalid signature".to_string());
     }
@@ -678,7 +676,7 @@ fn find_recovery_id(
         let key =
             libsecp256k1::recover(&message_bytes_32, &signature_bytes_64, &recovery_id).unwrap();
         if key.serialize_compressed() == public_key[..] {
-            return Ok(i as usize);
+            return Ok(i as u8);
         }
     }
     return Err("Not found".to_string());

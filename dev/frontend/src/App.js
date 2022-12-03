@@ -11,9 +11,9 @@ import {
   Heading,
   Text,
   Input,
-  Badge,
   Divider,
   Spinner,
+  IconButton,
   useToast
 } from "@chakra-ui/react";
 
@@ -30,7 +30,7 @@ import {
   useDisclosure
 } from '@chakra-ui/react'
 
-import { HiClock, HiPlusCircle, HiArrowLeftCircle, HiArrowDownOnSquareStack, HiCog6Tooth } from "react-icons/hi2";
+import { HiClock, HiPlusCircle, HiArrowLeftCircle, HiArrowDownOnSquareStack, HiCog6Tooth, HiArrowTopRightOnSquare, HiOutlineClipboardDocument, HiOutlineClipboardDocumentCheck } from "react-icons/hi2";
 
 import {
   Table,
@@ -157,7 +157,7 @@ const SendFundsModal = ({ provider, network, setTransactions, setBalance, actor,
         </ModalBody>
         <ModalFooter>
           <Button variant='ghost' mr={3} onClick={onClose}>Close</Button>
-          <Button onClick={handleSignTx}>Send</Button>
+          <Button onClick={handleSignTx} disabled={!amount || amount === '0'}>Send</Button>
         </ModalFooter>
       </ModalContent>
     </Modal>
@@ -224,7 +224,7 @@ const defaultNetwork = [].concat(testnets, testnets).find(r => r.chainId === +ch
 const NetworkModal = ({ onClose, isOpen, setNetwork }) => {
 
   const selectNetwork = (i, isMainnet) => {
-    
+
     const network = isMainnet ? mainnets[i] : testnets[i]
     setNetwork(network)
     onClose()
@@ -240,7 +240,7 @@ const NetworkModal = ({ onClose, isOpen, setNetwork }) => {
         <ModalCloseButton />
         <ModalBody mb="12px">
           <Tabs>
-            <TabList>
+            <TabList justifyContent="center">
               <Tab>Mainnets</Tab>
               <Tab>Testnets</Tab>
             </TabList>
@@ -332,6 +332,7 @@ const App = () => {
   const [provider, setProvider] = useState(null);
   const [address, setAddress] = useState(null);
   const [balance, setBalance] = useState(null);
+  const [hasCopied, setHasCopied] = useState(false);
   const [network, setNetwork] = useState(defaultNetwork);
   const [loggedIn, setLoggedIn] = useState(false);
   const [transactions, setTransactions] = useState([]);
@@ -350,7 +351,8 @@ const App = () => {
       setBalance(ethers.utils.formatEther(balance));
     } catch (error) {
       console.log(error);
-      toast({ title: "Error", status: 'error', variant: "subtle" });
+      const message = error?.result?.reject_message ?? ''
+      toast({ title: "Error", status: 'error', description: message, variant: "subtle" });
     }
   }, [network.chainId, toast])
 
@@ -385,7 +387,7 @@ const App = () => {
 
     const _authClient = await AuthClient.create({ identity: delegationIdentity });
     setAuthClient(_authClient);
-    
+
     if (delegationIdentity) {
       setLoggedIn(true);
 
@@ -435,6 +437,23 @@ const App = () => {
     setAddress(address);
   };
 
+  const copyToClipboard = async () => {
+    setHasCopied(true)
+
+    await navigator.clipboard.writeText(address)
+    toast({ title: "Copied to clipboard", variant: "subtle" });
+
+    setTimeout(() => setHasCopied(false), 2000)
+  }
+
+  const goToExplorer = () => {
+    if (network.explorers.length > 0) {
+      window.open(`${network.explorers[0].url}/address/${address}`, '_blank').focus()
+    } else {
+      toast({ title: "There is no explorer for this network", variant: "subtle" });
+    }
+  }
+
   return (
     <Flex justifyContent={'center'} margin="auto">
       <Box minW="sm" minH="sm" borderWidth='1px' borderRadius='lg' overflow='hidden' padding="16px">
@@ -453,16 +472,22 @@ const App = () => {
               {loggedIn ? (
                 <Box>
 
-                  {!address && (
+                  {!address ? (
                     <Button onClick={handleCreateEVMWallet}>Create EVM Wallet</Button>
-                  )}
-
-                  <Flex mb="40px" justifyContent="center">
-                    {balance ? <Text fontSize="3xl">{parseFloat(balance).toPrecision(3)} <Box as="span" fontSize="20px">{network.nativeCurrency.symbol}</Box></Text> : <Spinner/>}
-                  </Flex>
-                  <Flex mb="12px">
-                    {address && <Text><Badge>Address:</Badge> {address.slice(0, 8)}...{address.slice(-6)}</Text>}
-                  </Flex>
+                  ) :
+                    <>
+                      <Flex mb="40px" justifyContent="center">
+                        {balance ? <Text fontSize="3xl">{parseFloat(balance).toPrecision(3)} <Box as="span" fontSize="20px">{network.nativeCurrency.symbol}</Box></Text> : <Spinner />}
+                      </Flex>
+                      <Flex mb="12px">
+                        {address && <Flex alignItems="center">
+                          <Text>{address.slice(0, 10)}...{address.slice(-8)}</Text>
+                          <IconButton onClick={copyToClipboard} ml="8px" fontSize="16px" size="xs" variant="ghost" icon={hasCopied ? <HiOutlineClipboardDocumentCheck /> : <HiOutlineClipboardDocument />} />
+                          <IconButton onClick={goToExplorer} ml="4px" fontSize="16px" size="xs" variant="ghost" icon={<HiArrowTopRightOnSquare />} />
+                        </Flex>}
+                      </Flex>
+                    </>
+                  }
                 </Box>
               ) : (
                 <Button onClick={login} rightIcon={<IcLogo />}>
@@ -476,7 +501,7 @@ const App = () => {
               <Button variant="ghost" onClick={onHistoryOpen} leftIcon={<HiClock />} disabled={!loggedIn}>History</Button>
               {balance > 0 ?
                 <Button ml="8px" onClick={onSendOpen} leftIcon={<HiPlusCircle />} disabled={!loggedIn}>Transfer</Button> :
-                <Button onClick={handleTopUp} leftIcon={<HiArrowDownOnSquareStack />}>Top up</Button>
+                <Button ml="8px" onClick={handleTopUp} leftIcon={<HiArrowDownOnSquareStack />}>Top up</Button>
               }
               <Button variant="ghost" ml="8px" onClick={logout} leftIcon={<HiArrowLeftCircle />} disabled={!loggedIn}>Logout</Button>
             </Box>

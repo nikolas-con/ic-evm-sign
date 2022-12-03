@@ -383,8 +383,8 @@ const testnets = [
   },
   "infoURL": "",
   "shortName": "eth",
-  "chainId": 1337,
-  "networkId": 1337,
+  "chainId": 31337,
+  "networkId": 31337,
   "icon": "ethereum",
   "explorers": []
 }

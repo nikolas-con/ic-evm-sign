@@ -264,7 +264,7 @@ pub fn get_caller_data(principal_id: Principal, chain_id: u64) -> Result<CallerR
 
     let address = get_address_from_public_key(user.public_key.clone()).unwrap();
 
-    let chain_data = user
+    let transaction_data = user
         .transactions
         .get(&chain_id)
         .cloned()
@@ -272,7 +272,7 @@ pub fn get_caller_data(principal_id: Principal, chain_id: u64) -> Result<CallerR
 
     Ok(CallerResponse {
         address,
-        transactions: chain_data,
+        transactions: transaction_data,
     })
 }
 
