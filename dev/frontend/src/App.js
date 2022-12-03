@@ -13,6 +13,7 @@ import {
   Input,
   Badge,
   Divider,
+  Spinner,
   useToast
 } from "@chakra-ui/react";
 
@@ -217,13 +218,10 @@ const TransactionsModal = ({ onClose, isOpen, actor, transactions, setTransactio
 
 const networkIndex = localStorage.getItem("network") ?? 0
 
-const NetworkModal = ({ onClose, isOpen, setNetwork, setProvider }) => {
+const NetworkModal = ({ onClose, isOpen, setNetwork, loadProviderAndUser }) => {
 
   const selectNetwork = (i) => {
     
-    const rpcProvider = new ethers.providers.JsonRpcProvider(networks[i].rpc[0]);
-    setProvider(rpcProvider);
-
     setNetwork(networks[i])
     onClose()
     localStorage.setItem("network", i);
@@ -326,6 +324,7 @@ const App = () => {
 
   const loadUser = useCallback(async (_provider) => {
     try {
+      setBalance();
       const res = await actor.get_caller_data(Number(network.chainId));
       const { address, transactions } = res.Ok;
       setAddress(address);
@@ -362,7 +361,7 @@ const App = () => {
 
   const loadProviderAndUser = useCallback(async () => {
 
-    const rpcProvider = new ethers.providers.JsonRpcProvider(networks[networkIndex].rpc[0]);
+    const rpcProvider = new ethers.providers.JsonRpcProvider(network.rpc[0]);
     setProvider(rpcProvider);
 
     const delegationIdentity = getDelegationIdentity()
@@ -375,11 +374,11 @@ const App = () => {
 
       await loadUser(rpcProvider)
     }
-  }, [loadUser]);
+  }, [loadUser, network.rpc]);
 
   useEffect(() => {
     loadProviderAndUser();
-  }, [loadProviderAndUser]);
+  }, [loadProviderAndUser, network]);
 
   const login = async () => {
     const identityProvider = `${IC_URL}?canisterId=${IDENTITY_CANISTER_ID}`;
@@ -441,12 +440,12 @@ const App = () => {
                     <Button onClick={handleCreateEVMWallet}>Create EVM Wallet</Button>
                   )}
 
-                  <Box mb="40px">
-                    {balance && <Text textAlign="center" fontSize="3xl">{parseFloat(balance).toPrecision(3)} <Box as="span" fontSize="20px">{network.nativeCurrency.symbol}</Box></Text>}
-                  </Box>
-                  <Box mb="12px">
+                  <Flex mb="40px" justifyContent="center">
+                    {balance ? <Text fontSize="3xl">{parseFloat(balance).toPrecision(3)} <Box as="span" fontSize="20px">{network.nativeCurrency.symbol}</Box></Text> : <Spinner/>}
+                  </Flex>
+                  <Flex mb="12px">
                     {address && <Text><Badge>Address:</Badge> {address.slice(0, 8)}...{address.slice(-6)}</Text>}
-                  </Box>
+                  </Flex>
                 </Box>
               ) : (
                 <Button onClick={login} rightIcon={<IcLogo />}>
@@ -467,7 +466,7 @@ const App = () => {
 
             <SendFundsModal network={network} provider={provider} setTransactions={setTransactions} setBalance={setBalance} actor={actor} address={address} isOpen={isSendOpen} onClose={onSendClose} />
             <TransactionsModal network={network} actor={actor} setTransactions={setTransactions} transactions={transactions} isOpen={isHistoryOpen} onClose={onHistoryClose} />
-            <NetworkModal setProvider={setProvider} setNetwork={setNetwork} isOpen={isNetworkOpen} onClose={onNetworkClose} />
+            <NetworkModal setNetwork={setNetwork} isOpen={isNetworkOpen} onClose={onNetworkClose} />
           </Flex>
         </Flex>
       </Box>

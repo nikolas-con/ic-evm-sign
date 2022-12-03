@@ -185,8 +185,8 @@ const networks = [{
   },
   "infoURL": "",
   "shortName": "eth",
-  "chainId": 1,
-  "networkId": 1,
+  "chainId": 1337,
+  "networkId": 1337,
   "icon": "ethereum",
   "explorers": []
 }]
