@@ -31,7 +31,7 @@ import {
   useDisclosure
 } from '@chakra-ui/react'
 
-import { HiClock, HiPlusCircle, HiArrowLeftCircle } from "react-icons/hi2";
+import { HiClock, HiPlusCircle, HiArrowLeftCircle, HiArrowDownOnSquareStack } from "react-icons/hi2";
 
 const IcLogo = ({ width = 36, height = 16 }) => {
   return (
@@ -332,6 +332,7 @@ const App = () => {
     });
   };
 
+  // eslint-disable-next-line
   const handleTopUp = async () => {
     const signer = await provider.getSigner(FAUCET_ON_LOCAL_NODE);
 
@@ -390,7 +391,10 @@ const App = () => {
             <Divider mb="16px" mt="auto"/>
             <Box>
               <Button variant="ghost" onClick={onHistoryOpen} leftIcon={<HiClock />} disabled={!loggedIn}>History</Button>
-              <Button ml="8px" onClick={onSendOpen} leftIcon={<HiPlusCircle />} disabled={!loggedIn}>Transfer</Button>
+              {balance > 0 ? 
+                <Button ml="8px" onClick={onSendOpen} leftIcon={<HiPlusCircle />} disabled={!loggedIn}>Transfer</Button> :
+                <Button onClick={handleTopUp} leftIcon={<HiArrowDownOnSquareStack/>}>Top up</Button>
+              }
               <Button variant="ghost" ml="8px" onClick={logout} leftIcon={<HiArrowLeftCircle />} disabled={!loggedIn}>Logout</Button>
             </Box>
 
