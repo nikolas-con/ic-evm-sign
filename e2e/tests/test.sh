@@ -4,6 +4,6 @@ dfx start --clean --background
 
 cd ../../ && dfx deploy
 
-cd tests/e2e && npm run e2e
+cd tests/e2e && npm run test
 
 dfx stop

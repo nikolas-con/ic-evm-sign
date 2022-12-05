@@ -27,7 +27,7 @@ describe("Sign EVM Transactions", function () {
       "..",
       ".dfx",
       "local",
-      "canister_ids.json"
+      "canister_ids"
     ));
 
     const canisterId = Principal.fromText(canisters.IC_backend.local);
@@ -39,13 +39,14 @@ describe("Sign EVM Transactions", function () {
     actor = Actor.createActor(idlFactory, createActorOptions);
     const { chainId } = await ethers.provider.getNetwork();
     let address;
-    try {
-      const res = await actor.get_caller_data(chainId);
-      address = res.Ok.address;
-      await actor.clear_caller_history(chainId);
-    } catch {
+    const [caller] = await actor.get_caller_data(chainId);
+
+    if (!caller) {
       const res = await actor.create();
       address = res.Ok.address;
+    } else {
+      address = caller.address;
+      await actor.clear_caller_history(chainId);
     }
 
     const [owner, user] = await ethers.getSigners();
@@ -96,9 +97,9 @@ describe("Sign EVM Transactions", function () {
   });
   it("Sign EIP1559 Transaction", async function () {
     const { chainId } = await ethers.provider.getNetwork();
-    const res = await actor.get_caller_data(chainId);
+    const [caller] = await actor.get_caller_data(chainId);
 
-    const nonce = Number(res.Ok.transactions.nonce);
+    const nonce = Number(caller.transactions.nonce);
     const { maxFeePerGas, maxPriorityFeePerGas } =
       await ethers.provider.getFeeData();
     const gasLimit = ethers.BigNumber.from("23000").toHexString();
@@ -140,9 +141,9 @@ describe("Sign EVM Transactions", function () {
   });
   it("Sign EIP2930 Transaction", async function () {
     const { chainId } = await ethers.provider.getNetwork();
-    const res = await actor.get_caller_data(chainId);
+    const [caller] = await actor.get_caller_data(chainId);
 
-    const nonce = Number(res.Ok.transactions.nonce);
+    const nonce = Number(caller.transactions.nonce);
     const { maxPriorityFeePerGas, gasPrice } =
       await ethers.provider.getFeeData();
     const gasLimit = ethers.BigNumber.from("23000").toHexString();
@@ -185,8 +186,8 @@ describe("Sign EVM Transactions", function () {
   it("Deploy and used a contract with high level functions from canister", async function () {
     const { chainId } = await ethers.provider.getNetwork();
 
-    const res = await actor.get_caller_data(chainId);
-    const address = res.Ok.address;
+    const [caller] = await actor.get_caller_data(chainId);
+    const address = caller.address;
 
     const contract = await ethers.getContractFactory("ExampleToken");
 
@@ -243,11 +244,11 @@ describe("Sign EVM Transactions", function () {
 
     assert.ok(balanceOtherUser.eq(ethers.utils.parseUnits("1", 18)));
   });
-  it("Deploy and used a contract", async function () {
+  it.skip("Deploy and used a contract", async function () {
     const { chainId } = await ethers.provider.getNetwork();
 
-    const res = await actor.get_caller_data(chainId);
-    const address = res.Ok.address;
+    const [caller] = await actor.get_caller_data(chainId);
+    const address = caller.address;
 
     const contract = await ethers.getContractFactory("Example");
 
@@ -260,7 +261,7 @@ describe("Sign EVM Transactions", function () {
     const { maxFeePerGas, maxPriorityFeePerGas } =
       await ethers.provider.getFeeData();
 
-    let nonce = Number(res.Ok.transactions.nonce);
+    let nonce = Number(caller.transactions.nonce);
 
     const value = ethers.BigNumber.from("0");
     const type = ethers.BigNumber.from("2");

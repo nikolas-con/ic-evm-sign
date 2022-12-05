@@ -5,12 +5,7 @@
     "IC_backend": {
       "type": "rust",
       "package": "backend",
-      "candid": "dev/backend/backend.did"
-    },
-    "identity": {
-      "type": "custom",
-      "candid": "dev/identity/identity.did",
-      "wasm": "dev/identity/identity.wasm"
+      "candid": "e2e/backend/backend.did"
     }
   },
   "defaults": {

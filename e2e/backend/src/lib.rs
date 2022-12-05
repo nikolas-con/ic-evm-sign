@@ -113,17 +113,19 @@ fn clear_caller_history(chain_id: u64) -> Result<(), String> {
 }
 
 #[query]
-fn get_caller_data(chain_id: u64) -> Result<CallerResponse, String> {
+fn get_caller_data(chain_id: u64) -> Option<CallerResponse> {
     let principal_id = ic_cdk::caller();
 
-    let res = no_key_wallet::get_caller_data(principal_id, chain_id)
-        .map_err(|e| format!("Failed to call get_caller_data {}", e))
-        .unwrap();
+    let res = no_key_wallet::get_caller_data(principal_id, chain_id);
 
-    Ok(CallerResponse {
-        address: res.address,
-        transactions: res.transactions,
-    })
+    if let Some(caller) = res {
+        Some(CallerResponse {
+            address: caller.address,
+            transactions: caller.transactions,
+        })
+    } else {
+        None
+    }
 }
 
 candid::export_service!();

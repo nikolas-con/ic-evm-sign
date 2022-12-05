@@ -253,13 +253,13 @@ pub async fn transfer_erc_20(
     Ok(TransferERC20Response { tx: res.sign_tx })
 }
 
-pub fn get_caller_data(principal_id: Principal, chain_id: u64) -> Result<CallerResponse, String> {
+pub fn get_caller_data(principal_id: Principal, chain_id: u64) -> Option<CallerResponse> {
     let users = STATE.with(|s| s.borrow().users.clone());
     let user;
     if let Some(i) = users.get(&principal_id) {
         user = i.clone();
     } else {
-        return Err("this user does not exist".to_string());
+        return None;
     }
 
     let address = get_address_from_public_key(user.public_key.clone()).unwrap();
@@ -270,7 +270,7 @@ pub fn get_caller_data(principal_id: Principal, chain_id: u64) -> Result<CallerR
         .cloned()
         .unwrap_or_else(|| ChainData::default());
 
-    Ok(CallerResponse {
+    Some(CallerResponse {
         address,
         transactions: transaction_data,
     })

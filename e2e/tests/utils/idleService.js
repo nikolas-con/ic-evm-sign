@@ -39,7 +39,7 @@ const idleServiceOptions = (IDL) => {
     ),
     get_caller_data: IDL.Func(
       [IDL.Nat64],
-      [IDL.Variant({ Ok: caller_response, Err: IDL.Text })],
+      [IDL.Opt(caller_response)],
       ["query"]
     ),
     deploy_evm_contract: IDL.Func(
