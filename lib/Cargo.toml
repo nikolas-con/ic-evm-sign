@@ -1,10 +1,11 @@
 [package]
 name = "ic-evm-sign"
-version = "0.0.2"
+version = "0.0.3"
 edition = "2021"
 description = "This library enables Internet Computer canisters to sign transactions for EVM-compatible blockchains"
 license = "Apache-2.0"
 readme = "../README.md"
+documentation = "https://docs.rs/ic-evm-sign"
 
 [dependencies]
 ic-cdk = "0.5.2"
@@ -14,3 +15,9 @@ ethereum-rlp = "0.2.3"
 easy-hasher = "2.2.1"
 libsecp256k1 = "0.6.0"
 futures = "0.3.25"
+
+[profile.dev]
+opt-level = 0
+
+[profile.release]
+opt-level = 3
