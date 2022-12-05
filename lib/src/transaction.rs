@@ -31,9 +31,9 @@ pub struct TransactionLegacy {
     pub r: String,
     pub s: String,
 }
-impl From<Vec<u8>> for TransactionLegacy {
-    fn from(data: Vec<u8>) -> Self {
-        let rlp = rlp::Rlp::new(&data[..]);
+impl From<(Vec<u8>, u64)> for TransactionLegacy {
+    fn from(data: (Vec<u8>, u64)) -> Self {
+        let rlp = rlp::Rlp::new(&data.0[..]);
 
         let nonce_hex = rlp.at(0).as_val::<Vec<u8>>();
         let nonce = vec_u8_to_u64(&nonce_hex);
@@ -62,8 +62,7 @@ impl From<Vec<u8>> for TransactionLegacy {
         let s_hex = rlp.at(8).as_val::<Vec<u8>>();
         let s = vec_u8_to_string(&s_hex);
 
-        let chain_id_hex = rlp.at(9).as_val::<Vec<u8>>();
-        let chain_id = vec_u8_to_u64(&chain_id_hex);
+        let chain_id =data.1;
 
         TransactionLegacy {
             chain_id,
@@ -618,16 +617,7 @@ pub fn get_transaction(hex_raw_tx: &Vec<u8>, chain_id: u64) -> Result<Box<dyn Si
     let tx_type = get_transaction_type(hex_raw_tx).unwrap();
 
     if tx_type == TransactionType::Legacy {
-        let rlp = rlp::Rlp::new(&hex_raw_tx);
-        let mut stream = rlp::RlpStream::new_list(10);
-        for i in 0..=8 {
-            let item = rlp.at(i).as_val::<Vec<u8>>();
-            stream.append(&item);
-        }
-        stream.append(&u64_to_vec_u8(&chain_id));
-
-        let result = stream.out().to_vec();
-        Ok(Box::new(TransactionLegacy::from(result)))
+        Ok(Box::new(TransactionLegacy::from((hex_raw_tx.clone(), chain_id))))
     } else if tx_type == TransactionType::EIP1559 {
         Ok(Box::new(Transaction1559::from(hex_raw_tx.clone())))
     } else if tx_type == TransactionType::EIP2930 {

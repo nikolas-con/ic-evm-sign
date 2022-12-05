@@ -12,25 +12,25 @@ mod mocks;
 #[cfg(test)]
 use mocks::{ic_call, ic_timestamp};
 
-pub mod utils;
+mod utils;
 use utils::{get_address_from_public_key, get_derivation_path};
 
-pub mod ecdsa;
+mod ecdsa;
 use ecdsa::reply::*;
 use ecdsa::request::*;
 
 pub mod state;
 use state::*;
 
-mod transaction;
+pub mod transaction;
 use transaction::*;
 
 #[derive(CandidType, Serialize, Debug)]
-pub struct CreateResponse {
+pub struct CreateAddressResponse {
     pub address: String,
 }
 #[derive(CandidType, Deserialize, Debug)]
-pub struct SignResponse {
+pub struct SignTransactionResponse {
     pub sign_tx: Vec<u8>,
 }
 #[derive(CandidType, Deserialize, Debug)]
@@ -42,16 +42,12 @@ pub struct TransferERC20Response {
     pub tx: Vec<u8>,
 }
 #[derive(CandidType, Deserialize, Debug)]
-pub struct CallerTransactionsResponse {
-    pub transactions: Vec<Transaction>,
-}
-#[derive(CandidType, Deserialize, Debug)]
-pub struct CallerResponse {
+pub struct UserResponse {
     pub address: String,
     pub transactions: ChainData,
 }
 
-pub async fn create(principal_id: Principal) -> Result<CreateResponse, String> {
+pub async fn create_address(principal_id: Principal) -> Result<CreateAddressResponse, String> {
     let users = STATE.with(|s| s.borrow().users.clone());
     let user = users.get(&principal_id);
 
@@ -90,14 +86,14 @@ pub async fn create(principal_id: Principal) -> Result<CreateResponse, String> {
         state.users.insert(principal_id, user);
     });
 
-    Ok(CreateResponse { address })
+    Ok(CreateAddressResponse { address })
 }
 
-pub async fn sign(
+pub async fn sign_transaction(
     hex_raw_tx: Vec<u8>,
     chain_id: u64,
     principal_id: Principal,
-) -> Result<SignResponse, String> {
+) -> Result<SignTransactionResponse, String> {
     let users = STATE.with(|s| s.borrow().users.clone());
     let user;
 
@@ -155,7 +151,7 @@ pub async fn sign(
         }
     });
 
-    Ok(SignResponse { sign_tx: signed_tx })
+    Ok(SignTransactionResponse { sign_tx: signed_tx })
 }
 
 pub async fn deploy_contract(
@@ -198,7 +194,9 @@ pub async fn deploy_contract(
     };
 
     let raw_tx = tx.serialize().unwrap();
-    let res = sign(raw_tx, chain_id, principal_id).await.unwrap();
+    let res = sign_transaction(raw_tx, chain_id, principal_id)
+        .await
+        .unwrap();
 
     Ok(DeployContractResponse { tx: res.sign_tx })
 }
@@ -248,12 +246,14 @@ pub async fn transfer_erc_20(
 
     let raw_tx = tx.serialize().unwrap();
 
-    let res = sign(raw_tx, chain_id, principal_id).await.unwrap();
+    let res = sign_transaction(raw_tx, chain_id, principal_id)
+        .await
+        .unwrap();
 
     Ok(TransferERC20Response { tx: res.sign_tx })
 }
 
-pub fn get_caller_data(principal_id: Principal, chain_id: u64) -> Option<CallerResponse> {
+pub fn get_caller_data(principal_id: Principal, chain_id: u64) -> Option<UserResponse> {
     let users = STATE.with(|s| s.borrow().users.clone());
     let user;
     if let Some(i) = users.get(&principal_id) {
@@ -270,7 +270,7 @@ pub fn get_caller_data(principal_id: Principal, chain_id: u64) -> Option<CallerR
         .cloned()
         .unwrap_or_else(|| ChainData::default());
 
-    Some(CallerResponse {
+    Some(UserResponse {
         address,
         transactions: transaction_data,
     })

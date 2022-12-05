@@ -26,7 +26,7 @@ struct CallerResponse {
 async fn create() -> Result<CreateResponse, String> {
     let principal_id = ic_cdk::caller();
 
-    let res = ic_evm_sign::create(principal_id)
+    let res = ic_evm_sign::create_address(principal_id)
         .await
         .map_err(|e| format!("Failed to call ecdsa_public_key {}", e))
         .unwrap();
@@ -39,7 +39,7 @@ async fn create() -> Result<CreateResponse, String> {
 #[update]
 async fn sign_evm_tx(hex_raw_tx: Vec<u8>, chain_id: u64) -> Result<SignatureInfo, String> {
     let principal_id = ic_cdk::caller();
-    let res = ic_evm_sign::sign(hex_raw_tx, chain_id, principal_id)
+    let res = ic_evm_sign::sign_transaction(hex_raw_tx, chain_id, principal_id)
         .await
         .map_err(|e| format!("Failed to call sign_with_ecdsa {}", e))
         .unwrap();

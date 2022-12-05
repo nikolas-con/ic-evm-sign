@@ -10,7 +10,7 @@ fn create_new_user() {
     let text = "aaaaa-aa";
     let principal_id = Principal::from_text(text).unwrap();
 
-    let res = block_on(create(principal_id)).unwrap();
+    let res = block_on(create_address(principal_id)).unwrap();
     assert_eq!(res.address.len(), 42);
 }
 #[test]
@@ -42,10 +42,10 @@ fn sign_legacy_transaction() {
 
     let text = "aaaaa-aa";
     let principal_id = Principal::from_text(text).unwrap();
-    let res0 = block_on(create(principal_id)).unwrap();
+    let res0 = block_on(create_address(principal_id)).unwrap();
     let raw_tx = tx.serialize().unwrap();
     let chain_id: u64 = 1;
-    let res = block_on(sign(raw_tx.clone(), chain_id, principal_id)).unwrap();
+    let res = block_on(sign_transaction(raw_tx.clone(), chain_id, principal_id)).unwrap();
 
     let tx_signed = transaction::get_transaction(&res.sign_tx, chain_id).unwrap();
     assert_eq!(tx_signed.is_signed(), true);
@@ -95,11 +95,11 @@ fn sign_eip2930_transaction() {
 
     let text = "aaaaa-aa";
     let principal_id = Principal::from_text(text).unwrap();
-    let res0 = block_on(create(principal_id)).unwrap();
+    let res0 = block_on(create_address(principal_id)).unwrap();
 
     let raw_tx = tx.serialize().unwrap();
     let chain_id: u64 = 1;
-    let res = block_on(sign(raw_tx.clone(), chain_id, principal_id)).unwrap();
+    let res = block_on(sign_transaction(raw_tx.clone(), chain_id, principal_id)).unwrap();
 
     let tx_signed = transaction::get_transaction(&res.sign_tx, chain_id).unwrap();
     assert_eq!(tx_signed.is_signed(), true);
@@ -151,11 +151,11 @@ fn sign_eip1559_transaction() {
 
     let text = "aaaaa-aa";
     let principal_id = Principal::from_text(text).unwrap();
-    let res0 = block_on(create(principal_id)).unwrap();
+    let res0 = block_on(create_address(principal_id)).unwrap();
 
     let raw_tx = tx.serialize().unwrap();
     let chain_id: u64 = 1;
-    let res = block_on(sign(raw_tx, chain_id, principal_id)).unwrap();
+    let res = block_on(sign_transaction(raw_tx, chain_id, principal_id)).unwrap();
 
     let tx_signed = transaction::get_transaction(&res.sign_tx, chain_id).unwrap();
     assert_eq!(tx_signed.is_signed(), true);

@@ -244,7 +244,7 @@ describe("Sign EVM Transactions", function () {
 
     assert.ok(balanceOtherUser.eq(ethers.utils.parseUnits("1", 18)));
   });
-  it.skip("Deploy and used a contract", async function () {
+  it("Deploy and used a contract", async function () {
     const { chainId } = await ethers.provider.getNetwork();
 
     const [caller] = await actor.get_caller_data(chainId);
