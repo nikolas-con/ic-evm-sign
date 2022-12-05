@@ -7,6 +7,8 @@ This is a two-part process:
 1. Create new addresses on the Internet Computer using distributed ECDSA  key generation
 2. Sign transactions with these addresses as the canister itself or in behalve of the canister users using threshold ECDSA signatures
 
+There an example project at [ic-evm-sign-starter](https://github.com/nikolas-con/ic-evm-sign-starter).
+
 # Features
 - Create EVM addresses
 - Sign EVM transactions
@@ -18,12 +20,17 @@ This is a two-part process:
 
 # Getting Started
 
+### Starter Project 
 
-### 1. Install the library 
+You can get start quickly with [ic-evm-sign-starter](https://github.com/nikolas-con/ic-evm-sign-starter).
 
-Run `cargo add ic-evm` in your project
+### Existing Project
 
-### 2. Create new EVM address
+#### 1. Install the library 
+
+Run `cargo add ic-evm-sign` in your project
+
+#### 2. Create new EVM address
 
 Create a new EVM-compatible address from a canister
 
@@ -48,19 +55,19 @@ Test locally with:
 dfx canister call ${canister_name} create_address
 ```
 
-### 3. Sign EVM transaction
+#### 3. Sign EVM transaction
 
 Sign an EVM-compatible transaction from a canister
 
 ```rust
-use ic_evm;
+use ic_evm_sign;
 
 #[update]
 async fn sign_tx(hex_raw_tx: Vec<u8>) -> Result<String, String> {
 
     let chain_id = 1;
     let principal_id = ic_cdk::caller();
-    let response = ic_evm::sign(hex_raw_tx, chain_id, principal_id).await
+    let response = ic_evm_sign::sign(hex_raw_tx, chain_id, principal_id).await
         .map_err(|e| format!("Failed to sign tx {}", e))
         .unwrap();
 
@@ -112,7 +119,7 @@ For transaction hex:
 Use a different EVM-compatible blockchain using `chain_id` in:
 
 ```rust
-ic_evm::sign(hex_raw_tx, chain_id, principal_id)
+ic_evm_sign::sign(hex_raw_tx, chain_id, principal_id)
 ```
 
 Find chain ids at: [https://chainlist.org](https://chainlist.org)
@@ -122,7 +129,7 @@ Find chain ids at: [https://chainlist.org](https://chainlist.org)
 You can sign different transaction types hex by passing their corresponding hex using `hex_raw_tx` in:
 
 ```rust
-ic_evm::sign(hex_raw_tx, chain_id, principal_id)
+ic_evm_sign::sign(hex_raw_tx, chain_id, principal_id)
 ```
 
 Find transaction types at: [https://github.com/ethereum/execution-specs](https://github.com/ethereum/execution-specs/blob/master/lists/signature-types/README.md)
