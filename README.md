@@ -35,13 +35,13 @@ Run `cargo add ic-evm-sign` in your project
 Create a new EVM-compatible address from a canister
 
 ```rust
-use ic_evm;
+use ic_evm_sign;
 
 #[update]
 async fn create_address() -> Result<String, String> {
 
     let principal_id = ic_cdk::caller();
-    let response = ic_evm::create(principal_id).await
+    let response = ic_evm::create_address(principal_id).await
         .map_err(|e| format!("Failed to create address {}", e))
         .unwrap();
 
@@ -67,8 +67,8 @@ async fn sign_tx(hex_raw_tx: Vec<u8>) -> Result<String, String> {
 
     let chain_id = 1;
     let principal_id = ic_cdk::caller();
-    let response = ic_evm_sign::sign(hex_raw_tx, chain_id, principal_id).await
-        .map_err(|e| format!("Failed to sign tx {}", e))
+    let response = ic_evm_sign::sign_transaction(hex_raw_tx, chain_id, principal_id).await
+        .map_err(|e| format!("Failed to sign transaction {}", e))
         .unwrap();
 
     Ok(response.sign_tx)
