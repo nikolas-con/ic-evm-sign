@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
-dfx start --clean --background
+dfx start --clean --background && clear
 
-cd ../../ && dfx deploy
+cd ../../ && dfx deploy && clear
 
-cd tests/e2e && npm run test
+cd e2e/tests && npm run test
 
 dfx stop

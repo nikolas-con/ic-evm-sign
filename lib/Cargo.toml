@@ -1,5 +1,5 @@
 [package]
-name = "no_key_wallet"
+name = "ic-evm-sign"
 version = "0.1.0"
 edition = "2021"
 

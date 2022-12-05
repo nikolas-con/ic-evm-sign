@@ -1,7 +1,7 @@
 use ic_cdk::export::candid::CandidType;
 use ic_cdk_macros::*;
-use no_key_wallet;
-use no_key_wallet::state::ChainData;
+use ic_evm_sign;
+use ic_evm_sign::state::ChainData;
 
 #[derive(Debug, CandidType)]
 struct CreateResponse {
@@ -26,7 +26,7 @@ struct CallerResponse {
 async fn create() -> Result<CreateResponse, String> {
     let principal_id = ic_cdk::caller();
 
-    let res = no_key_wallet::create(principal_id)
+    let res = ic_evm_sign::create(principal_id)
         .await
         .map_err(|e| format!("Failed to call ecdsa_public_key {}", e))
         .unwrap();
@@ -39,7 +39,7 @@ async fn create() -> Result<CreateResponse, String> {
 #[update]
 async fn sign_evm_tx(hex_raw_tx: Vec<u8>, chain_id: u64) -> Result<SignatureInfo, String> {
     let principal_id = ic_cdk::caller();
-    let res = no_key_wallet::sign(hex_raw_tx, chain_id, principal_id)
+    let res = ic_evm_sign::sign(hex_raw_tx, chain_id, principal_id)
         .await
         .map_err(|e| format!("Failed to call sign_with_ecdsa {}", e))
         .unwrap();
@@ -58,7 +58,7 @@ async fn deploy_evm_contract(
     max_fee_per_gas: u64,
 ) -> Result<DeployEVMContractResponse, String> {
     let principal_id = ic_cdk::caller();
-    let res = no_key_wallet::deploy_contract(
+    let res = ic_evm_sign::deploy_contract(
         principal_id,
         bytecode,
         chain_id,
@@ -84,7 +84,7 @@ async fn transfer_erc_20(
     contract_address: String,
 ) -> Result<DeployEVMContractResponse, String> {
     let principal_id = ic_cdk::caller();
-    let res = no_key_wallet::transfer_erc_20(
+    let res = ic_evm_sign::transfer_erc_20(
         principal_id,
         chain_id,
         max_priority_fee_per_gas,
@@ -105,7 +105,7 @@ async fn transfer_erc_20(
 fn clear_caller_history(chain_id: u64) -> Result<(), String> {
     let principal_id = ic_cdk::caller();
 
-    let res = no_key_wallet::clear_caller_history(principal_id, chain_id)
+    let res = ic_evm_sign::clear_caller_history(principal_id, chain_id)
         .map_err(|e| format!("Failed to call clear_caller_history {}", e))
         .unwrap();
 
@@ -116,7 +116,7 @@ fn clear_caller_history(chain_id: u64) -> Result<(), String> {
 fn get_caller_data(chain_id: u64) -> Option<CallerResponse> {
     let principal_id = ic_cdk::caller();
 
-    let res = no_key_wallet::get_caller_data(principal_id, chain_id);
+    let res = ic_evm_sign::get_caller_data(principal_id, chain_id);
 
     if let Some(caller) = res {
         Some(CallerResponse {
@@ -137,10 +137,10 @@ fn export_candid() -> String {
 
 #[ic_cdk_macros::pre_upgrade]
 fn pre_upgrade() {
-    no_key_wallet::pre_upgrade();
+    ic_evm_sign::pre_upgrade();
 }
 
 #[ic_cdk_macros::post_upgrade]
 fn post_upgrade() {
-    no_key_wallet::post_upgrade();
+    ic_evm_sign::post_upgrade();
 }

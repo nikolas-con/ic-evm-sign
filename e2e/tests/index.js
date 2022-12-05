@@ -30,7 +30,7 @@ describe("Sign EVM Transactions", function () {
       "canister_ids"
     ));
 
-    const canisterId = Principal.fromText(canisters.IC_backend.local);
+    const canisterId = Principal.fromText(canisters.backend.local);
 
     const agent = new HttpAgent({ host: "http://localhost:8000" });
     agent.fetchRootKey();

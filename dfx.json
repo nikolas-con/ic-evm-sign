@@ -2,7 +2,7 @@
   "version": 1,
   "dfx": "0.11.2",
   "canisters": {
-    "IC_backend": {
+    "backend": {
       "type": "rust",
       "package": "backend",
       "candid": "e2e/backend/backend.did"

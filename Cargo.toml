@@ -1,2 +1,2 @@
 [workspace]
-members = ["e2e/backend", "lib/no_key_wallet"]
+members = ["e2e/backend", "lib"]

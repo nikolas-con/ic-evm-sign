@@ -62,7 +62,7 @@ dependencies = [
  "candid",
  "ic-cdk",
  "ic-cdk-macros",
- "no_key_wallet",
+ "ic-evm-sign",
 ]
 
 [[package]]
@@ -632,6 +632,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "ic-evm-sign"
+version = "0.1.0"
+dependencies = [
+ "candid",
+ "easy-hasher",
+ "ethereum-rlp",
+ "futures",
+ "ic-cdk",
+ "libsecp256k1",
+ "serde",
+]
+
+[[package]]
 name = "ic-types"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -860,19 +873,6 @@ name = "new_debug_unreachable"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e4a24736216ec316047a1fc4252e27dabb04218aa4a3f37c6e7ddbf1f9782b54"
-
-[[package]]
-name = "no_key_wallet"
-version = "0.1.0"
-dependencies = [
- "candid",
- "easy-hasher",
- "ethereum-rlp",
- "futures",
- "ic-cdk",
- "libsecp256k1",
- "serde",
-]
 
 [[package]]
 name = "num-bigint"
