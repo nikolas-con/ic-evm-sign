@@ -16,6 +16,7 @@ const createRawTxLegacy = (txParams) => {
 
   return tx;
 };
+
 const createRawTx1559 = (txParams) => {
   const common = new Common({
     chain: Chain.Mainnet,
@@ -37,6 +38,7 @@ const createRawTx2930 = (txParams) => {
 
   return tx;
 };
+
 const signTx = async (rawTX, actor) => {
   const serializedTx = rawTX.serialize();
   const { chainId } = await ethers.provider.getNetwork();
@@ -45,6 +47,7 @@ const signTx = async (rawTX, actor) => {
 
   return "0x" + Buffer.from(res.Ok.sign_tx, "hex").toString("hex");
 };
+
 module.exports = {
   createRawTxLegacy,
   createRawTx1559,

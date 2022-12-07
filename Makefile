@@ -11,7 +11,6 @@ e2e-test:
  unit-test: 
 	cd lib && cargo test
 
-
 .PHONY: tests
 .SILENT: tests
 tests: e2e-test unit-test

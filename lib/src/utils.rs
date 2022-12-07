@@ -22,7 +22,7 @@ pub fn get_address_from_public_key(public_key: Vec<u8>) -> Result<String, String
     Ok(address)
 }
 
-pub fn get_transfer_data(address: &str, value: u64) -> Result<String, String> {
+pub fn get_transfer_data(address: &str, amount: u64) -> Result<String, String> {
     if address.len() != 42 {
         return Err("Invalid address".to_string());
     }
@@ -32,10 +32,10 @@ pub fn get_transfer_data(address: &str, value: u64) -> Result<String, String> {
 
     let address_64 = format!("{:0>64}", &address[2..]);
 
-    let value_hex = format!("{:02x}", value);
-    let value_64 = format!("{:0>64}", value_hex);
+    let amount_hex = format!("{:02x}", amount);
+    let amount_64 = format!("{:0>64}", amount_hex);
 
-    Ok(method_id.to_owned() + &address_64 + &value_64)
+    Ok(method_id.to_owned() + &address_64 + &amount_64)
 }
 
 pub fn string_to_vec_u8(str: &str) -> Vec<u8> {
@@ -51,11 +51,13 @@ pub fn string_to_vec_u8(str: &str) -> Vec<u8> {
         .map(|i| u8::from_str_radix(&str[i..i + 2], 16).unwrap())
         .collect::<Vec<u8>>()
 }
+
 pub fn remove_leading(vec: Vec<u8>, element: u8) -> Vec<u8> {
     let start = vec.iter().position(|&x| x != element).unwrap();
     let result = &vec[start..];
     result.to_vec()
 }
+
 pub fn u64_to_vec_u8(u: &u64) -> Vec<u8> {
     u.to_be_bytes()
         .into_iter()
@@ -79,7 +81,6 @@ pub fn vec_u8_to_u64(vec: &Vec<u8>) -> u64 {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
 
     #[test]
@@ -99,6 +100,7 @@ mod tests {
         let result = get_address_from_public_key(public_key_to_vec);
         assert_eq!(result, expected);
     }
+
     #[test]
     fn get_address_from_public_with_empty_public_key() {
         let expected = Err("Invalid length of public key".to_string());
@@ -113,10 +115,11 @@ mod tests {
         let expected ="a9059cbb000000000000000000000000907dc4d0be5d691970cae886fcab34ed65a2cd660000000000000000000000000000000000000000000000000000000000000001";
 
         let address = "0x907dc4d0be5d691970cae886fcab34ed65a2cd66";
-        let value = 1;
-        let result = get_transfer_data(address, value).unwrap();
+        let amount = 1;
+        let result = get_transfer_data(address, amount).unwrap();
         assert_eq!(result, expected);
     }
+
     #[test]
     fn get_transfer_data_with_invalid_address() {
         let expected = Err("Invalid address".to_string());

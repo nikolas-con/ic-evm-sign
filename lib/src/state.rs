@@ -11,6 +11,7 @@ pub struct Transaction {
     pub data: Vec<u8>,
     pub timestamp: u64,
 }
+
 impl Default for Transaction {
     fn default() -> Self {
         Transaction {
@@ -19,30 +20,30 @@ impl Default for Transaction {
         }
     }
 }
+
 #[derive(Debug, Clone, CandidType, Serialize, Deserialize)]
-pub struct ChainData {
+pub struct TransactionChainData {
     pub nonce: u64,
     pub transactions: Vec<Transaction>,
 }
-impl Default for ChainData {
+
+impl Default for TransactionChainData {
     fn default() -> Self {
-        ChainData {
+        TransactionChainData {
             nonce: 0 as u64,
             transactions: vec![],
         }
     }
 }
-
-pub type ChainId = u64;
 #[derive(Clone, Debug, CandidType, Deserialize, Default)]
-pub struct User {
+pub struct UserData {
     pub public_key: Vec<u8>,
-    pub transactions: HashMap<ChainId, ChainData>,
+    pub transactions: HashMap<u64, TransactionChainData>,
 }
 
 #[derive(Default, CandidType, Deserialize, Debug)]
 pub struct State {
-    pub users: HashMap<Principal, User>,
+    pub users: HashMap<Principal, UserData>,
 }
 
 thread_local! {

@@ -15,30 +15,33 @@ pub mod reply {
     }
 
     #[derive(CandidType, Deserialize, Debug)]
-    pub struct ECDSAPublicKeyReply {
+    pub struct ECDSAPublicKeyResponse {
         pub public_key: Vec<u8>,
         pub chain_code: Vec<u8>,
     }
 
     #[derive(CandidType, Deserialize, Debug)]
-    pub struct SignWithECDSAReply {
+    pub struct SignWithECDSAResponse {
         pub signature: Vec<u8>,
     }
 }
 pub mod request {
     use super::*;
+
     #[derive(CandidType, Serialize, Debug)]
     pub struct ECDSAPublicKey {
         pub canister_id: Option<CanisterId>,
         pub derivation_path: Vec<Vec<u8>>,
         pub key_id: EcdsaKeyId,
     }
+
     #[derive(CandidType, Serialize, Debug, Deserialize)]
     pub struct SignWithECDSA {
         pub message_hash: Vec<u8>,
         pub derivation_path: Vec<Vec<u8>>,
         pub key_id: EcdsaKeyId,
     }
+
     #[derive(CandidType, Serialize, Debug, Clone, Deserialize)]
     pub struct EcdsaKeyId {
         pub curve: EcdsaCurve,

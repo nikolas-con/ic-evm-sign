@@ -44,7 +44,7 @@ pub struct TransferERC20Response {
 #[derive(CandidType, Deserialize, Debug)]
 pub struct UserResponse {
     pub address: String,
-    pub transactions: ChainData,
+    pub transactions: TransactionChainData,
 }
 
 pub async fn create_address(principal_id: Principal) -> Result<CreateAddressResponse, String> {
@@ -68,7 +68,7 @@ pub async fn create_address(principal_id: Principal) -> Result<CreateAddressResp
         key_id: key_id.clone(),
     };
 
-    let (res,): (ECDSAPublicKeyReply,) = ic_call(
+    let (res,): (ECDSAPublicKeyResponse,) = ic_call(
         Principal::management_canister(),
         "ecdsa_public_key",
         (request,),
@@ -78,7 +78,7 @@ pub async fn create_address(principal_id: Principal) -> Result<CreateAddressResp
 
     let address = get_address_from_public_key(res.public_key.clone()).unwrap();
 
-    let mut user = User::default();
+    let mut user = UserData::default();
     user.public_key = res.public_key;
 
     STATE.with(|s| {
@@ -121,7 +121,7 @@ pub async fn sign_transaction(
         key_id: key_id.clone(),
     };
 
-    let (res,): (SignWithECDSAReply,) = ic_call(
+    let (res,): (SignWithECDSAResponse,) = ic_call(
         Principal::management_canister(),
         "sign_with_ecdsa",
         (request,),
@@ -143,7 +143,7 @@ pub async fn sign_transaction(
             user_tx.transactions.push(transaction);
             user_tx.nonce = tx.get_nonce().unwrap() + 1;
         } else {
-            let mut chain_data = ChainData::default();
+            let mut chain_data = TransactionChainData::default();
             chain_data.nonce = tx.get_nonce().unwrap() + 1;
             chain_data.transactions.push(transaction);
 
@@ -268,7 +268,7 @@ pub fn get_caller_data(principal_id: Principal, chain_id: u64) -> Option<UserRes
         .transactions
         .get(&chain_id)
         .cloned()
-        .unwrap_or_else(|| ChainData::default());
+        .unwrap_or_else(|| TransactionChainData::default());
 
     Some(UserResponse {
         address,
@@ -307,6 +307,5 @@ pub fn post_upgrade() {
         *s.borrow_mut() = s_prev;
     });
 }
-
 #[cfg(test)]
 mod tests;

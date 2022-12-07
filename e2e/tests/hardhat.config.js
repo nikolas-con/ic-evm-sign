@@ -2,8 +2,6 @@ require("@nomicfoundation/hardhat-toolbox");
 require("dotenv").config();
 require("@nomiclabs/hardhat-ethers");
 
-/** @type import('hardhat/config').HardhatUserConfig */
-
 const ALCHEMY_KEY = process.env.ALCHEMY_KEY;
 
 module.exports = {

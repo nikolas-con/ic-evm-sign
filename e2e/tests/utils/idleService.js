@@ -7,7 +7,7 @@ const idleServiceOptions = (IDL) => {
     nonce: IDL.Nat64,
     transactions: IDL.Vec(transactions),
   });
-  const create_response = IDL.Record({
+  const create_address_response = IDL.Record({
     address: IDL.Text,
   });
   const sign_tx_response = IDL.Record({
@@ -27,9 +27,9 @@ const idleServiceOptions = (IDL) => {
   });
 
   return {
-    create: IDL.Func(
+    create_address: IDL.Func(
       [],
-      [IDL.Variant({ Ok: create_response, Err: IDL.Text })],
+      [IDL.Variant({ Ok: create_address_response, Err: IDL.Text })],
       []
     ),
     sign_evm_tx: IDL.Func(

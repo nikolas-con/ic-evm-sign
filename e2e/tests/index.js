@@ -1,19 +1,13 @@
 const { Actor, HttpAgent } = require("@dfinity/agent");
 const { Principal } = require("@dfinity/principal");
-const {
-  createRawTx1559,
-  createRawTx2930,
-  createRawTxLegacy,
-  signTx,
-} = require("./utils");
+const { createRawTx1559, createRawTx2930, createRawTxLegacy, signTx } = require("./utils");
 const { idleServiceOptions } = require("./utils/idleService");
-
 const path = require("path");
-const fetch = require("node-fetch");
-global.fetch = fetch;
-
 const { assert } = require("chai");
 const { ethers } = require("hardhat");
+const fetch = require("node-fetch");
+
+global.fetch = fetch;
 
 describe("Sign EVM Transactions", function () {
   let actor;
@@ -42,7 +36,7 @@ describe("Sign EVM Transactions", function () {
     const [caller] = await actor.get_caller_data(chainId);
 
     if (!caller) {
-      const res = await actor.create();
+      const res = await actor.create_address();
       address = res.Ok.address;
     } else {
       address = caller.address;
@@ -91,14 +85,12 @@ describe("Sign EVM Transactions", function () {
 
     const otherUserAfter = await otherUser.getBalance();
 
-    assert.ok(
-      otherUserAfter.sub(otherUserBefore).eq(ethers.utils.parseEther(value))
-    );
+    assert.ok(otherUserAfter.sub(otherUserBefore).eq(ethers.utils.parseEther(value)));
   });
+
   it("Sign EIP1559 Transaction", async function () {
     const { chainId } = await ethers.provider.getNetwork();
     const [caller] = await actor.get_caller_data(chainId);
-
     const nonce = Number(caller.transactions.nonce);
     const { maxFeePerGas, maxPriorityFeePerGas } =
       await ethers.provider.getFeeData();
@@ -135,14 +127,12 @@ describe("Sign EVM Transactions", function () {
 
     const otherUserAfter = await otherUser.getBalance();
 
-    assert.ok(
-      otherUserAfter.sub(otherUserBefore).eq(ethers.utils.parseEther(value))
-    );
+    assert.ok(otherUserAfter.sub(otherUserBefore).eq(ethers.utils.parseEther(value)));
   });
+
   it("Sign EIP2930 Transaction", async function () {
     const { chainId } = await ethers.provider.getNetwork();
     const [caller] = await actor.get_caller_data(chainId);
-
     const nonce = Number(caller.transactions.nonce);
     const { maxPriorityFeePerGas, gasPrice } =
       await ethers.provider.getFeeData();
@@ -179,10 +169,9 @@ describe("Sign EVM Transactions", function () {
 
     const otherUserAfter = await otherUser.getBalance();
 
-    assert.ok(
-      otherUserAfter.sub(otherUserBefore).eq(ethers.utils.parseEther(value))
-    );
+    assert.ok(otherUserAfter.sub(otherUserBefore).eq(ethers.utils.parseEther(value)));
   });
+
   it("Deploy and used a contract with high level functions from canister", async function () {
     const { chainId } = await ethers.provider.getNetwork();
 
@@ -200,7 +189,7 @@ describe("Sign EVM Transactions", function () {
     const { maxFeePerGas, maxPriorityFeePerGas } =
       await ethers.provider.getFeeData();
 
-    const res1 = await actor.deploy_evm_contract(
+    const resDeployContract = await actor.deploy_evm_contract(
       [...bytecode],
       chainId,
       maxPriorityFeePerGas.toNumber(),
@@ -208,9 +197,9 @@ describe("Sign EVM Transactions", function () {
       maxFeePerGas.toNumber()
     );
 
-    const tx = "0x" + Buffer.from(res1.Ok.tx, "hex").toString("hex");
+    const txSignedDeployContract = "0x" + Buffer.from(resDeployContract.Ok.tx, "hex").toString("hex");
 
-    const { hash } = await ethers.provider.sendTransaction(tx);
+    const { hash } = await ethers.provider.sendTransaction(txSignedDeployContract);
 
     const receiptDeployContract = await ethers.provider.waitForTransaction(
       hash
@@ -224,7 +213,7 @@ describe("Sign EVM Transactions", function () {
     assert.ok(balance.eq(ethers.utils.parseUnits("100000", 18)));
 
     const addressOtherUser = await otherUser.getAddress();
-    const res2 = await actor.transfer_erc_20(
+    const resTransferERC20 = await actor.transfer_erc_20(
       chainId,
       maxPriorityFeePerGas.toNumber(),
       estimatedGasDeploy.toNumber(),
@@ -234,16 +223,17 @@ describe("Sign EVM Transactions", function () {
       contractAddress
     );
 
-    const tx2 = "0x" + Buffer.from(res2.Ok.tx, "hex").toString("hex");
+    const txSignedTransferERC20 = "0x" + Buffer.from(resTransferERC20.Ok.tx, "hex").toString("hex");
 
-    const { hash: hash2 } = await ethers.provider.sendTransaction(tx2);
+    const { hash: hashTransferERC20 } = await ethers.provider.sendTransaction(txSignedTransferERC20);
 
-    await ethers.provider.waitForTransaction(hash2);
+    await ethers.provider.waitForTransaction(hashTransferERC20);
 
     const balanceOtherUser = await deployedContract.balanceOf(addressOtherUser);
 
     assert.ok(balanceOtherUser.eq(ethers.utils.parseUnits("1", 18)));
   });
+
   it("Deploy and used a contract", async function () {
     const { chainId } = await ethers.provider.getNetwork();
 
@@ -256,19 +246,14 @@ describe("Sign EVM Transactions", function () {
       data: contract.getDeployTransaction().data,
     });
 
-    const data = contract.bytecode;
-
-    const { maxFeePerGas, maxPriorityFeePerGas } =
-      await ethers.provider.getFeeData();
-
+    const { maxFeePerGas, maxPriorityFeePerGas } = await ethers.provider.getFeeData();
     let nonce = Number(caller.transactions.nonce);
-
     const value = ethers.BigNumber.from("0");
     const type = ethers.BigNumber.from("2");
     const chainId_tx = ethers.BigNumber.from(chainId.toString()).toHexString();
 
     const txDataDeployContract = {
-      data,
+      data: contract.bytecode,
       gasLimit: estimatedGasDeploy.toHexString(),
       maxPriorityFeePerGas: maxPriorityFeePerGas.toHexString(),
       maxFeePerGas: maxFeePerGas.toHexString(),
@@ -324,9 +309,9 @@ describe("Sign EVM Transactions", function () {
 
     const signedTx = await signTx(tx, actor);
 
-    const { hash: hash2 } = await ethers.provider.sendTransaction(signedTx);
+    const { hash: hashSigned } = await ethers.provider.sendTransaction(signedTx);
 
-    await ethers.provider.waitForTransaction(hash2);
+    await ethers.provider.waitForTransaction(hashSigned);
 
     const nameAfter = await deployedContract.name();
     assert.ok(nameAfter === "bar");
