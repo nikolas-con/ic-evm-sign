@@ -1,7 +1,7 @@
 #[cfg(not(test))]
 use ic_cdk::api::time as ic_timestamp;
 #[cfg(not(test))]
-use ic_cdk::call as ic_call;
+use ic_cdk::api::call::call_with_payment as ic_call;
 use ic_cdk::export::{
     candid::CandidType,
     serde::{Deserialize, Serialize},
@@ -72,6 +72,7 @@ pub async fn create_address(principal_id: Principal) -> Result<CreateAddressResp
         Principal::management_canister(),
         "ecdsa_public_key",
         (request,),
+        0 as u64
     )
     .await
     .map_err(|e| format!("Failed to call ecdsa_public_key {}", e.1))?;
@@ -125,6 +126,7 @@ pub async fn sign_transaction(
         Principal::management_canister(),
         "sign_with_ecdsa",
         (request,),
+        0 as u64
     )
     .await
     .map_err(|e| format!("Failed to call sign_with_ecdsa {}", e.1))?;

@@ -27,6 +27,7 @@ pub fn ic_call<T: ArgumentEncoder, R: for<'a> ArgumentDecoder<'a>>(
     _id: Principal,
     method: &str,
     args: T,
+    _cycles: u64,
 ) -> impl Future<Output = CallResult<R>> + '_ {
     let args_raw = candid::encode_args(args).expect("Failed to encode arguments.");
 
