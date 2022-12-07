@@ -3,36 +3,27 @@ const {
   FeeMarketEIP1559Transaction,
   AccessListEIP2930Transaction,
 } = require("@ethereumjs/tx");
+const { Common, Hardfork } = require("@ethereumjs/common");
 
-const { Chain, Common, Hardfork } = require("@ethereumjs/common");
 
-const createRawTxLegacy = (txParams) => {
-  const common = new Common({
-    chain: Chain.Mainnet,
-    hardfork: Hardfork.SpuriousDragon,
-  });
-
+const createRawTxLegacy = (txParams, chainId) => {
+  const common = Common.custom({ chainId, hardfork: Hardfork.SpuriousDragon})
+  
   const tx = Transaction.fromTxData(txParams, { common });
-
+  
   return tx;
 };
 
-const createRawTx1559 = (txParams) => {
-  const common = new Common({
-    chain: Chain.Mainnet,
-    hardfork: Hardfork.London,
-  });
-
+const createRawTx1559 = (txParams, chainId) => {
+  const common = Common.custom({ chainId ,hardfork: Hardfork.London})
+  
   const tx = FeeMarketEIP1559Transaction.fromTxData(txParams, { common });
-
+  
   return tx;
 };
 
-const createRawTx2930 = (txParams) => {
-  const common = new Common({
-    chain: Chain.Mainnet,
-    hardfork: Hardfork.Berlin,
-  });
+const createRawTx2930 = (txParams, chainId) => {
+  const common = Common.custom({ chainId, hardfork: Hardfork.Berlin})
 
   const tx = AccessListEIP2930Transaction.fromTxData(txParams, { common });
 

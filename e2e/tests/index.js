@@ -63,6 +63,7 @@ describe("Sign EVM Transactions", function () {
     const value = "1";
     const value_hex = ethers.utils.parseEther(value).toHexString();
     const data = ethers.BigNumber.from("0").toHexString();
+    const { chainId } = await ethers.provider.getNetwork()
 
     const txParams = {
       nonce,
@@ -73,7 +74,7 @@ describe("Sign EVM Transactions", function () {
       data,
     };
 
-    const tx = createRawTxLegacy(txParams);
+    const tx = createRawTxLegacy(txParams, chainId);
 
     const signedTx = await signTx(tx, actor);
 
@@ -115,7 +116,7 @@ describe("Sign EVM Transactions", function () {
       type,
     };
 
-    const tx = createRawTx1559(txData);
+    const tx = createRawTx1559(txData, chainId);
 
     const signedTx = await signTx(tx, actor);
 
@@ -157,7 +158,7 @@ describe("Sign EVM Transactions", function () {
       type,
     };
 
-    const tx = createRawTx2930(txData);
+    const tx = createRawTx2930(txData, chainId);
 
     const signedTx = await signTx(tx, actor);
 
@@ -265,7 +266,7 @@ describe("Sign EVM Transactions", function () {
       type: type.toHexString(),
     };
 
-    const deployContractTx = createRawTx1559(txDataDeployContract);
+    const deployContractTx = createRawTx1559(txDataDeployContract, chainId);
 
     const deployContractSignedTx = await signTx(deployContractTx, actor);
 
@@ -305,7 +306,7 @@ describe("Sign EVM Transactions", function () {
       type: type.toHexString(),
     };
 
-    const tx = createRawTx1559(txData);
+    const tx = createRawTx1559(txData, chainId);
 
     const signedTx = await signTx(tx, actor);
 
