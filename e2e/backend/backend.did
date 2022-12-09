@@ -1,1 +1,1 @@
-service : {}
+service : ( opt variant {  Development; Staging; Production; } ) -> {}

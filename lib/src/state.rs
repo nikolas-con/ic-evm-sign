@@ -41,9 +41,55 @@ pub struct UserData {
     pub transactions: HashMap<u64, TransactionChainData>,
 }
 
-#[derive(Default, CandidType, Deserialize, Debug)]
+
+#[derive(CandidType, Deserialize, Debug, Clone, PartialEq, Default)]
+pub enum Environment {
+    #[default] Development,
+    Staging,
+    Production,
+}
+
+#[derive(CandidType, Deserialize, Debug, Clone)]
+pub struct Config {
+    pub env: Environment,
+    pub key_name: String,
+    pub sign_cycles: u64 
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self::from(Environment::Development)
+    }
+}
+
+impl From<Environment> for Config {
+     fn from(env: Environment) -> Self {
+        if env == Environment::Staging {
+            Self {
+                env: Environment::Staging,
+                key_name: "test_key_1".to_string(),
+                sign_cycles: 10_000_000_000
+            }
+        }  else if env == Environment::Production {
+            Self {
+                env: Environment::Staging,
+                key_name: "key_1".to_string(),
+                sign_cycles: 26_153_846_153
+            }
+        } else {
+            Self {
+                env: Environment::Development,
+                key_name: "dfx_test_key".to_string(),
+                sign_cycles: 0
+            }
+        }
+     }
+}
+
+#[derive(Default, CandidType, Deserialize, Debug, Clone)]
 pub struct State {
     pub users: HashMap<Principal, UserData>,
+    pub config: Config
 }
 
 thread_local! {

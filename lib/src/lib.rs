@@ -47,9 +47,18 @@ pub struct UserResponse {
     pub transactions: TransactionChainData,
 }
 
+pub fn init(env_opt: Option<Environment> ) {
+    if let Some(env) = env_opt {
+        STATE.with(|s| {
+            let mut state = s.borrow_mut();
+            state.config = Config::from(env);
+        })
+    }
+}
+
 pub async fn create_address(principal_id: Principal) -> Result<CreateAddressResponse, String> {
-    let users = STATE.with(|s| s.borrow().users.clone());
-    let user = users.get(&principal_id);
+    let state = STATE.with(|s| s.borrow().clone());
+    let user = state.users.get(&principal_id);
 
     if let Some(_) = user {
         return Err("this wallet already exist".to_string());
@@ -57,7 +66,7 @@ pub async fn create_address(principal_id: Principal) -> Result<CreateAddressResp
 
     let key_id = EcdsaKeyId {
         curve: EcdsaCurve::Secp256k1,
-        name: "dfx_test_key".to_string(),
+        name: state.config.key_name
     };
 
     let caller = get_derivation_path(principal_id);
@@ -95,14 +104,15 @@ pub async fn sign_transaction(
     chain_id: u64,
     principal_id: Principal,
 ) -> Result<SignTransactionResponse, String> {
-    let users = STATE.with(|s| s.borrow().users.clone());
+    let state = STATE.with(|s| s.borrow().clone());
     let user;
 
-    if let Some(i) = users.get(&principal_id) {
+    if let Some(i) = state.users.get(&principal_id) {
         user = i.clone();
     } else {
         return Err("this user does not exist".to_string());
     }
+
     let mut tx = transaction::get_transaction(&hex_raw_tx, chain_id.clone()).unwrap();
 
     let message = tx.get_message_to_sign().unwrap();
@@ -111,7 +121,7 @@ pub async fn sign_transaction(
 
     let key_id = EcdsaKeyId {
         curve: EcdsaCurve::Secp256k1,
-        name: "dfx_test_key".to_string(),
+        name: state.config.key_name,
     };
 
     let caller = get_derivation_path(principal_id);
@@ -126,7 +136,7 @@ pub async fn sign_transaction(
         Principal::management_canister(),
         "sign_with_ecdsa",
         (request,),
-        0 as u64
+        state.config.sign_cycles
     )
     .await
     .map_err(|e| format!("Failed to call sign_with_ecdsa {}", e.1))?;
