@@ -119,7 +119,7 @@ For transaction hex:
 Use a different EVM-compatible blockchain using `chain_id` in:
 
 ```rust
-ic_evm_sign::sign(hex_raw_tx, chain_id, principal_id)
+ic_evm_sign::sign_transaction(hex_raw_tx, chain_id, principal_id)
 ```
 
 Find chain ids at: [https://chainlist.org](https://chainlist.org)
@@ -129,7 +129,7 @@ Find chain ids at: [https://chainlist.org](https://chainlist.org)
 You can sign different transaction types hex by passing their corresponding hex using `hex_raw_tx` in:
 
 ```rust
-ic_evm_sign::sign(hex_raw_tx, chain_id, principal_id)
+ic_evm_sign::sign_transaction(hex_raw_tx, chain_id, principal_id)
 ```
 
 Find transaction types at: [https://github.com/ethereum/execution-specs](https://github.com/ethereum/execution-specs/blob/master/lists/signature-types/README.md)
