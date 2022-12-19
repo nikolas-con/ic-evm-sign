@@ -141,11 +141,7 @@ Find transaction types at: [https://github.com/ethereum/execution-specs](https:/
 1. Download the repo with `git clone`
 2. Run unit tests with `cargo test`
 
-### To develop on the local frontend:
+#### To run the e2e tests:
 
-1. Start a hardhat node with `npm start` in `dev/local-node` (terminal 1) - Requires `npm i`
-2. Run an ic replica with `dfx start` (terminal 2)
-3. And deploy the example canister with `dfx deploy`
-4. Then start the example frontend with `npm start` (terminal 3) in `dev/frontend` - Requires `npm i`
-
-
+1. Install dependencies with `npm i` in `e2e/tests`
+2. Then run the e2e script with `make e2e-test`
