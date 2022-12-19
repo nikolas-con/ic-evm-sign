@@ -1,7 +1,7 @@
 use ic_cdk::export::candid::CandidType;
 use ic_cdk_macros::*;
 use ic_evm_sign;
-use ic_evm_sign::state::{Environment, TransactionChainData};
+use ic_evm_sign::state::{Environment, State, TransactionChainData, STATE};
 
 #[derive(Debug, CandidType)]
 struct CreateAddressResponse {
@@ -140,4 +140,20 @@ candid::export_service!();
 #[ic_cdk_macros::query(name = "__get_candid_interface_tmp_hack")]
 fn export_candid() -> String {
     __export_service()
+}
+
+#[ic_cdk_macros::pre_upgrade]
+fn pre_upgrade() {
+    let state = STATE.with(|s| s.borrow().clone());
+
+    ic_cdk::storage::stable_save((state,)).unwrap();
+}
+
+#[ic_cdk_macros::post_upgrade]
+fn post_upgrade() {
+    let (s_prev_1,): (State,) = ic_cdk::storage::stable_restore().unwrap();
+
+    STATE.with(|s| {
+        *s.borrow_mut() = s_prev_1;
+    });
 }
