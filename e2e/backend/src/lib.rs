@@ -1,7 +1,7 @@
 use ic_cdk::export::candid::CandidType;
 use ic_cdk_macros::*;
 use ic_evm_sign;
-use ic_evm_sign::state::{TransactionChainData, Environment};
+use ic_evm_sign::state::{Environment, TransactionChainData};
 
 #[derive(Debug, CandidType)]
 struct CreateAddressResponse {
@@ -41,7 +41,10 @@ async fn create_address() -> Result<CreateAddressResponse, String> {
 }
 
 #[update]
-async fn sign_evm_tx(hex_raw_tx: Vec<u8>, chain_id: u64) -> Result<SignTransactionResponse, String> {
+async fn sign_evm_tx(
+    hex_raw_tx: Vec<u8>,
+    chain_id: u64,
+) -> Result<SignTransactionResponse, String> {
     let principal_id = ic_cdk::caller();
     let res = ic_evm_sign::sign_transaction(hex_raw_tx, chain_id, principal_id)
         .await
@@ -137,14 +140,4 @@ candid::export_service!();
 #[ic_cdk_macros::query(name = "__get_candid_interface_tmp_hack")]
 fn export_candid() -> String {
     __export_service()
-}
-
-#[ic_cdk_macros::pre_upgrade]
-fn pre_upgrade() {
-    ic_evm_sign::pre_upgrade();
-}
-
-#[ic_cdk_macros::post_upgrade]
-fn post_upgrade() {
-    ic_evm_sign::post_upgrade();
 }
