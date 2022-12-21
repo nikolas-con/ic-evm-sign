@@ -1,6 +1,6 @@
 [package]
 name = "ic-evm-sign"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2021"
 description = "This library enables Internet Computer canisters to sign transactions for EVM-compatible blockchains"
 license = "Apache-2.0"
