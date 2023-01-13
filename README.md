@@ -145,3 +145,11 @@ Find transaction types at: [https://github.com/ethereum/execution-specs](https:/
 
 1. Install dependencies with `npm i` in `e2e/tests`
 2. Then run the e2e script with `make e2e-test`
+
+# Security
+
+The code in this library has not been audited (as of 13/1/22). Use it at your own risk. The same applies for [ic-evm-sign-starter](https://github.com/nikolas-con/ic-evm-sign-starter).
+
+# Funding
+
+This library was initially incentivized by [ICDevs](https://icdevs.org/).
