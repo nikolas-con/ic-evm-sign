@@ -72,7 +72,7 @@ impl From<Environment> for Config {
             }
         }  else if env == Environment::Production {
             Self {
-                env: Environment::Staging,
+                env: Environment::Production,
                 key_name: "key_1".to_string(),
                 sign_cycles: 26_153_846_153
             }
