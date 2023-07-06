@@ -22,11 +22,11 @@ fn sign_legacy_transaction() {
     let expected_address = "0x907dc4d0be5d691970cae886fcab34ed65a2cd66";
 
     let tx = transaction::TransactionLegacy {
-        nonce: 0,
-        gas_price: 0,
-        gas_limit: 0,
+        nonce: [0; 32],
+        gas_price: [0; 32],
+        gas_limit: [0; 32],
         to: "0x0000000000000000000000000000000000000000".to_string(),
-        value: 0,
+        value: [0; 32],
         data: "0x00".to_string(),
         chain_id: 1,
         v: "0x00".to_string(),
@@ -73,11 +73,11 @@ fn sign_eip2930_transaction() {
 
     let tx = transaction::Transaction2930 {
         chain_id: 1,
-        nonce: 0,
-        gas_price: 0,
-        gas_limit: 0,
+        nonce: [0; 32],
+        gas_price: [0; 32],
+        gas_limit: [0; 32],
         to: "0x0000000000000000000000000000000000000000".to_string(),
-        value: 0,
+        value: [0; 32],
         data: "0x00".to_string(),
         access_list: vec![],
         v: "0x00".to_string(),
@@ -124,12 +124,12 @@ fn sign_eip1559_transaction() {
 
     let tx = transaction::Transaction1559 {
         chain_id: 1,
-        nonce: 0,
-        max_priority_fee_per_gas: 0,
-        gas_limit: 0,
-        max_fee_per_gas: 0,
+        nonce: [0; 32],
+        max_priority_fee_per_gas: [0; 32],
+        gas_limit: [0; 32],
+        max_fee_per_gas: [0; 32],
         to: "0x0000000000000000000000000000000000000000".to_string(),
-        value: 0,
+        value: [0; 32],
         data: "0x00".to_string(),
         access_list: vec![],
         v: "0x00".to_string(),

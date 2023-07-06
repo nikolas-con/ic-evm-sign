@@ -22,7 +22,7 @@ pub fn get_address_from_public_key(public_key: Vec<u8>) -> Result<String, String
     Ok(address)
 }
 
-pub fn get_transfer_data(address: &str, amount: u64) -> Result<String, String> {
+pub fn get_transfer_data(address: &str, amount: [u8; 32]) -> Result<String, String> {
     if address.len() != 42 {
         return Err("Invalid address".to_string());
     }
@@ -32,7 +32,11 @@ pub fn get_transfer_data(address: &str, amount: u64) -> Result<String, String> {
 
     let address_64 = format!("{:0>64}", &address[2..]);
 
-    let amount_hex = format!("{:02x}", amount);
+    let amount_hex = amount
+        .into_iter()
+        .map(|x| format!("{:02x}", x))
+        .collect::<Vec<String>>()
+        .concat();
     let amount_64 = format!("{:0>64}", amount_hex);
 
     Ok(method_id.to_owned() + &address_64 + &amount_64)
@@ -79,6 +83,26 @@ pub fn vec_u8_to_u64(vec: &Vec<u8>) -> u64 {
     u64::from_be_bytes(_vec).try_into().unwrap()
 }
 
+pub fn u256_to_vec_u8(u: &[u8; 32]) -> Vec<u8> {
+    u.into_iter().skip_while(|&x| *x == 0).map(|x| *x).collect()
+}
+
+pub fn vec_u8_to_u256(vec: &Vec<u8>) -> [u8; 32] {
+    let mut _vec = [0; 32];
+    _vec[32 - vec.len()..].copy_from_slice(&vec);
+    _vec
+}
+
+#[allow(unused)]
+pub fn u64_to_u256(value: u64) -> [u8; 32] {
+    vec_u8_to_u256(&u64_to_vec_u8(&value))
+}
+
+pub fn u256_to_u64(value: [u8; 32]) -> u64 {
+    let v = u256_to_vec_u8(&value);
+    vec_u8_to_u64(&v)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -115,7 +139,8 @@ mod tests {
         let expected ="a9059cbb000000000000000000000000907dc4d0be5d691970cae886fcab34ed65a2cd660000000000000000000000000000000000000000000000000000000000000001";
 
         let address = "0x907dc4d0be5d691970cae886fcab34ed65a2cd66";
-        let amount = 1;
+        let mut amount = [0; 32];
+        amount[31] = 1;
         let result = get_transfer_data(address, amount).unwrap();
         assert_eq!(result, expected);
     }
@@ -124,7 +149,8 @@ mod tests {
     fn get_transfer_data_with_invalid_address() {
         let expected = Err("Invalid address".to_string());
         let address = "0x00";
-        let value = 1;
+        let mut value = [0; 32];
+        value[31] = 1;
         let result = get_transfer_data(address, value);
         assert_eq!(result, expected);
     }

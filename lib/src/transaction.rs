@@ -1,4 +1,7 @@
-use crate::utils::{ remove_leading, string_to_vec_u8, u64_to_vec_u8, vec_u8_to_string, vec_u8_to_u64 };
+use crate::utils::{
+    remove_leading, string_to_vec_u8, u256_to_vec_u8, u64_to_vec_u8, vec_u8_to_string,
+    vec_u8_to_u256, vec_u8_to_u64,
+};
 use easy_hasher::easy_hasher;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -14,17 +17,19 @@ pub trait Sign {
     fn is_signed(&self) -> bool;
     fn get_signature(&self) -> Result<Vec<u8>, String>;
     fn get_recovery_id(&self) -> Result<u8, String>;
-    fn get_nonce(&self) -> Result<u64, String>;
+    fn get_nonce(&self) -> Result<U256, String>;
     fn serialize(&self) -> Result<Vec<u8>, String>;
 }
 
+pub type U256 = [u8; 32];
+
 pub struct TransactionLegacy {
     pub chain_id: u64,
-    pub nonce: u64,
-    pub gas_price: u64,
-    pub gas_limit: u64,
+    pub nonce: U256,
+    pub gas_price: U256,
+    pub gas_limit: U256,
     pub to: String,
-    pub value: u64,
+    pub value: U256,
     pub data: String,
     pub v: String,
     pub r: String,
@@ -34,20 +39,20 @@ impl From<(Vec<u8>, u64)> for TransactionLegacy {
     fn from(data: (Vec<u8>, u64)) -> Self {
         let rlp = rlp::Rlp::new(&data.0[..]);
 
-        let nonce_hex = rlp.at(0).as_val::<Vec<u8>>();
-        let nonce = vec_u8_to_u64(&nonce_hex);
+        let nonce_hex: Vec<u8> = rlp.at(0).as_val::<Vec<u8>>();
+        let nonce = vec_u8_to_u256(&nonce_hex);
 
         let gas_price_hex = rlp.at(1).as_val::<Vec<u8>>();
-        let gas_price = vec_u8_to_u64(&gas_price_hex);
+        let gas_price = vec_u8_to_u256(&gas_price_hex);
 
         let gas_limit_hex = rlp.at(2).as_val::<Vec<u8>>();
-        let gas_limit = vec_u8_to_u64(&gas_limit_hex);
+        let gas_limit = vec_u8_to_u256(&gas_limit_hex);
 
         let to_hex = rlp.at(3).as_val::<Vec<u8>>();
         let to = vec_u8_to_string(&to_hex);
 
         let value_hex = rlp.at(4).as_val::<Vec<u8>>();
-        let value = vec_u8_to_u64(&value_hex);
+        let value = vec_u8_to_u256(&value_hex);
 
         let data_tx_hex = rlp.at(5).as_val::<Vec<u8>>();
         let data_tx = vec_u8_to_string(&data_tx_hex);
@@ -82,11 +87,11 @@ impl Sign for TransactionLegacy {
         let mut stream = rlp::RlpStream::new_list(9);
 
         let items = [
-            u64_to_vec_u8(&self.nonce),
-            u64_to_vec_u8(&self.gas_price),
-            u64_to_vec_u8(&self.gas_limit),
+            u256_to_vec_u8(&self.nonce),
+            u256_to_vec_u8(&self.gas_price),
+            u256_to_vec_u8(&self.gas_limit),
             string_to_vec_u8(&self.to),
-            u64_to_vec_u8(&self.value),
+            u256_to_vec_u8(&self.value),
             string_to_vec_u8(&self.data),
             u64_to_vec_u8(&self.chain_id),
         ];
@@ -166,19 +171,19 @@ impl Sign for TransactionLegacy {
     fn serialize(&self) -> Result<Vec<u8>, String> {
         let mut stream = rlp::RlpStream::new_list(9);
 
-        let nonce = u64_to_vec_u8(&self.nonce);
+        let nonce = u256_to_vec_u8(&self.nonce);
         stream.append(&nonce);
 
-        let gas_price = u64_to_vec_u8(&self.gas_price);
+        let gas_price = u256_to_vec_u8(&self.gas_price);
         stream.append(&gas_price);
 
-        let gas_limit = u64_to_vec_u8(&self.gas_limit);
+        let gas_limit = u256_to_vec_u8(&self.gas_limit);
         stream.append(&gas_limit);
 
         let to = string_to_vec_u8(&self.to[..]);
         stream.append(&to);
 
-        let value = u64_to_vec_u8(&self.value);
+        let value = u256_to_vec_u8(&self.value);
         stream.append(&value);
 
         let data = string_to_vec_u8(&self.data[..]);
@@ -195,18 +200,18 @@ impl Sign for TransactionLegacy {
 
         Ok(stream.out().to_vec())
     }
-    fn get_nonce(&self) -> Result<u64, String> {
+    fn get_nonce(&self) -> Result<U256, String> {
         Ok(self.nonce)
     }
 }
 
 pub struct Transaction2930 {
     pub chain_id: u64,
-    pub nonce: u64,
-    pub gas_price: u64,
-    pub gas_limit: u64,
+    pub nonce: U256,
+    pub gas_price: U256,
+    pub gas_limit: U256,
     pub to: String,
-    pub value: u64,
+    pub value: U256,
     pub data: String,
     pub access_list: Vec<(String, Vec<String>)>,
     pub v: String,
@@ -221,19 +226,19 @@ impl From<Vec<u8>> for Transaction2930 {
         let chain_id = vec_u8_to_u64(&chain_id_hex);
 
         let nonce_hex = rlp.at(1).as_val::<Vec<u8>>();
-        let nonce = vec_u8_to_u64(&nonce_hex);
+        let nonce = vec_u8_to_u256(&nonce_hex);
 
         let gas_price_hex = rlp.at(2).as_val::<Vec<u8>>();
-        let gas_price = vec_u8_to_u64(&gas_price_hex);
+        let gas_price = vec_u8_to_u256(&gas_price_hex);
 
         let gas_limit_hex = rlp.at(3).as_val::<Vec<u8>>();
-        let gas_limit = vec_u8_to_u64(&gas_limit_hex);
+        let gas_limit = vec_u8_to_u256(&gas_limit_hex);
 
         let to_hex = rlp.at(4).as_val::<Vec<u8>>();
         let to = vec_u8_to_string(&to_hex);
 
         let value_hex = rlp.at(5).as_val::<Vec<u8>>();
-        let value = vec_u8_to_u64(&value_hex);
+        let value = vec_u8_to_u256(&value_hex);
 
         let data_tx_hex = rlp.at(6).as_val::<Vec<u8>>();
         let data_tx = vec_u8_to_string(&data_tx_hex);
@@ -268,11 +273,11 @@ impl Sign for Transaction2930 {
         let mut stream = rlp::RlpStream::new_list(8);
         let items = [
             u64_to_vec_u8(&self.chain_id),
-            u64_to_vec_u8(&self.nonce),
-            u64_to_vec_u8(&self.gas_price),
-            u64_to_vec_u8(&self.gas_limit),
+            u256_to_vec_u8(&self.nonce),
+            u256_to_vec_u8(&self.gas_price),
+            u256_to_vec_u8(&self.gas_limit),
             string_to_vec_u8(&self.to),
-            u64_to_vec_u8(&self.value),
+            u256_to_vec_u8(&self.value),
             string_to_vec_u8(&self.data),
         ];
 
@@ -358,19 +363,19 @@ impl Sign for Transaction2930 {
         let chain_id = u64_to_vec_u8(&self.chain_id);
         stream.append(&chain_id);
 
-        let nonce = u64_to_vec_u8(&self.nonce);
+        let nonce = u256_to_vec_u8(&self.nonce);
         stream.append(&nonce);
 
-        let gas_price = u64_to_vec_u8(&self.gas_price);
+        let gas_price = u256_to_vec_u8(&self.gas_price);
         stream.append(&gas_price);
 
-        let gas_limit = u64_to_vec_u8(&self.gas_limit);
+        let gas_limit = u256_to_vec_u8(&self.gas_limit);
         stream.append(&gas_limit);
 
         let to = string_to_vec_u8(&self.to[..]);
         stream.append(&to);
 
-        let value = u64_to_vec_u8(&self.value);
+        let value = u256_to_vec_u8(&self.value);
         stream.append(&value);
 
         let data = string_to_vec_u8(&self.data[..]);
@@ -392,19 +397,19 @@ impl Sign for Transaction2930 {
 
         Ok([&[0x01], &result[..]].concat())
     }
-    fn get_nonce(&self) -> Result<u64, String> {
+    fn get_nonce(&self) -> Result<U256, String> {
         Ok(self.nonce)
     }
 }
 
 pub struct Transaction1559 {
     pub chain_id: u64,
-    pub nonce: u64,
-    pub max_priority_fee_per_gas: u64,
-    pub gas_limit: u64,
-    pub max_fee_per_gas: u64,
+    pub nonce: U256,
+    pub max_priority_fee_per_gas: U256,
+    pub gas_limit: U256,
+    pub max_fee_per_gas: U256,
     pub to: String,
-    pub value: u64,
+    pub value: U256,
     pub data: String,
     pub access_list: Vec<(String, Vec<String>)>,
     pub v: String,
@@ -419,23 +424,23 @@ impl From<Vec<u8>> for Transaction1559 {
         let chain_id = vec_u8_to_u64(&chain_id_hex);
 
         let nonce_hex = rlp.at(1).as_val::<Vec<u8>>();
-        let nonce = vec_u8_to_u64(&nonce_hex);
+        let nonce = vec_u8_to_u256(&nonce_hex);
 
         let max_priority_fee_per_gas_hex = rlp.at(2).as_val::<Vec<u8>>();
-        let max_priority_fee_per_gas = vec_u8_to_u64(&max_priority_fee_per_gas_hex);
+        let max_priority_fee_per_gas = vec_u8_to_u256(&max_priority_fee_per_gas_hex);
 
         let max_fee_per_gas_hex = rlp.at(3).as_val::<Vec<u8>>();
 
-        let max_fee_per_gas = vec_u8_to_u64(&max_fee_per_gas_hex);
+        let max_fee_per_gas = vec_u8_to_u256(&max_fee_per_gas_hex);
 
         let gas_limit_hex = rlp.at(4).as_val::<Vec<u8>>();
-        let gas_limit = vec_u8_to_u64(&gas_limit_hex);
+        let gas_limit = vec_u8_to_u256(&gas_limit_hex);
 
         let to_hex = rlp.at(5).as_val::<Vec<u8>>();
         let to = vec_u8_to_string(&to_hex);
 
         let value_hex = rlp.at(6).as_val::<Vec<u8>>();
-        let value = vec_u8_to_u64(&value_hex);
+        let value = vec_u8_to_u256(&value_hex);
 
         let data_tx_hex = rlp.at(7).as_val::<Vec<u8>>();
         let data_tx = vec_u8_to_string(&data_tx_hex);
@@ -472,12 +477,12 @@ impl Sign for Transaction1559 {
         let mut stream = rlp::RlpStream::new_list(9);
         let items = [
             u64_to_vec_u8(&self.chain_id),
-            u64_to_vec_u8(&self.nonce),
-            u64_to_vec_u8(&self.max_priority_fee_per_gas),
-            u64_to_vec_u8(&self.max_fee_per_gas),
-            u64_to_vec_u8(&self.gas_limit),
+            u256_to_vec_u8(&self.nonce),
+            u256_to_vec_u8(&self.max_priority_fee_per_gas),
+            u256_to_vec_u8(&self.max_fee_per_gas),
+            u256_to_vec_u8(&self.gas_limit),
             string_to_vec_u8(&self.to),
-            u64_to_vec_u8(&self.value),
+            u256_to_vec_u8(&self.value),
             string_to_vec_u8(&self.data),
         ];
 
@@ -566,22 +571,22 @@ impl Sign for Transaction1559 {
         let chain_id = u64_to_vec_u8(&self.chain_id);
         stream.append(&chain_id);
 
-        let nonce = u64_to_vec_u8(&self.nonce);
+        let nonce = u256_to_vec_u8(&self.nonce);
         stream.append(&nonce);
 
-        let max_priority_fee_per_gas = u64_to_vec_u8(&self.max_priority_fee_per_gas);
+        let max_priority_fee_per_gas = u256_to_vec_u8(&self.max_priority_fee_per_gas);
         stream.append(&max_priority_fee_per_gas);
 
-        let max_fee_per_gas = u64_to_vec_u8(&self.max_fee_per_gas);
+        let max_fee_per_gas = u256_to_vec_u8(&self.max_fee_per_gas);
         stream.append(&max_fee_per_gas);
 
-        let gas_limit = u64_to_vec_u8(&self.gas_limit);
+        let gas_limit = u256_to_vec_u8(&self.gas_limit);
         stream.append(&gas_limit);
 
         let to = string_to_vec_u8(&self.to[..]);
         stream.append(&to);
 
-        let value = u64_to_vec_u8(&self.value);
+        let value = u256_to_vec_u8(&self.value);
         stream.append(&value);
 
         let data = string_to_vec_u8(&self.data[..]);
@@ -604,7 +609,7 @@ impl Sign for Transaction1559 {
 
         Ok([&[0x02], &result[..]].concat())
     }
-    fn get_nonce(&self) -> Result<u64, String> {
+    fn get_nonce(&self) -> Result<U256, String> {
         Ok(self.nonce)
     }
 }
