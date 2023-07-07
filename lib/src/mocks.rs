@@ -6,7 +6,7 @@ use candid::utils::{ArgumentDecoder, ArgumentEncoder};
 use candid::{Decode, Encode};
 use ic_cdk::api::call::{CallResult, RejectionCode};
 use ic_cdk::export::Principal;
-use libsecp256k1::{PublicKey, SecretKey};
+use libsecp256k1_test::{PublicKey, SecretKey};
 use std::cell::RefCell;
 use std::future::Future;
 
@@ -63,9 +63,9 @@ pub fn ic_call<T: ArgumentEncoder, R: for<'a> ArgumentDecoder<'a>>(
 
             let message: [u8; 32] = args.message_hash[..32].try_into().unwrap();
 
-            let message_parsed = libsecp256k1::Message::parse(&message);
+            let message_parsed = libsecp256k1_test::Message::parse(&message);
 
-            let signature = libsecp256k1::sign(&message_parsed, &private_key);
+            let signature = libsecp256k1_test::sign(&message_parsed, &private_key);
 
             let res = SignWithECDSAResponse {
                 signature: signature.0.serialize().to_vec(),

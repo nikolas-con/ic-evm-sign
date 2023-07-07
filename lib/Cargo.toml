@@ -13,5 +13,8 @@ candid = "0.7.14"
 serde = "1"
 ethereum-rlp = "0.2.3"
 easy-hasher = "2.2.1"
-libsecp256k1 = { version = "0.6.0", default-features = false, features = ["lazy-static-context"] }
+libsecp256k1 = { version = "0.6.0", package = "libsecp256k1", default-features = false, features = ["lazy-static-context"] }
 futures = "0.3.25"
+
+[dev-dependencies]
+libsecp256k1_test = { version = "0.5.0", package = "libsecp256k1" }
