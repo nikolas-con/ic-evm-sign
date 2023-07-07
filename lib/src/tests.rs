@@ -21,12 +21,13 @@ fn sign_legacy_transaction() {
     let expected_get_message_to_sign_after = "eb86127620fbc047c6b6c2fcedea010143538e452dc7cb67a7fb1f8a00abdbd9";
     let expected_address = "0x907dc4d0be5d691970cae886fcab34ed65a2cd66";
 
+    use primitive_types::U256;
     let tx = transaction::TransactionLegacy {
-        nonce: [0; 32],
-        gas_price: [0; 32],
-        gas_limit: [0; 32],
+        nonce: 0,
+        gas_price: U256::zero(),
+        gas_limit: 0,
         to: "0x0000000000000000000000000000000000000000".to_string(),
-        value: [0; 32],
+        value: U256::zero(),
         data: "0x00".to_string(),
         chain_id: 1,
         v: "0x00".to_string(),
@@ -71,13 +72,14 @@ fn sign_eip2930_transaction() {
     let expected_get_message_to_sign_after = "1db9b0174e2b28a2073c88acbc792a5445407c5a8bf7bc5c65a047d45885eb89";
     let expected_address = "0x907dc4d0be5d691970cae886fcab34ed65a2cd66";
 
+    use primitive_types::U256;
     let tx = transaction::Transaction2930 {
         chain_id: 1,
-        nonce: [0; 32],
-        gas_price: [0; 32],
-        gas_limit: [0; 32],
+        nonce: 0,
+        gas_price: U256::zero(),
+        gas_limit: 0,
         to: "0x0000000000000000000000000000000000000000".to_string(),
-        value: [0; 32],
+        value: U256::zero(),
         data: "0x00".to_string(),
         access_list: vec![],
         v: "0x00".to_string(),
@@ -122,14 +124,15 @@ fn sign_eip1559_transaction() {
     let expected_get_message_to_sign_after = "79965df63d7d9364f4bc8ed54ffd1c267042d4db673e129e3c459afbcb73a6f1";
     let expected_address = "0x907dc4d0be5d691970cae886fcab34ed65a2cd66";
 
+    use primitive_types::U256;
     let tx = transaction::Transaction1559 {
         chain_id: 1,
-        nonce: [0; 32],
-        max_priority_fee_per_gas: [0; 32],
-        gas_limit: [0; 32],
-        max_fee_per_gas: [0; 32],
+        nonce: 0,
+        max_priority_fee_per_gas: U256::zero(),
+        gas_limit: 0,
+        max_fee_per_gas: U256::zero(),
         to: "0x0000000000000000000000000000000000000000".to_string(),
-        value: [0; 32],
+        value: U256::zero(),
         data: "0x00".to_string(),
         access_list: vec![],
         v: "0x00".to_string(),

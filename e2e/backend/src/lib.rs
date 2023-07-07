@@ -70,7 +70,7 @@ async fn deploy_evm_contract(
         bytecode,
         chain_id,
         ic_evm_sign::u64_to_u256(max_priority_fee_per_gas),
-        ic_evm_sign::u64_to_u256(gas_limit),
+        gas_limit,
         ic_evm_sign::u64_to_u256(max_fee_per_gas),
     )
     .await
@@ -95,7 +95,7 @@ async fn transfer_erc_20(
         principal_id,
         chain_id,
         ic_evm_sign::u64_to_u256(max_priority_fee_per_gas),
-        ic_evm_sign::u64_to_u256(gas_limit),
+        gas_limit,
         ic_evm_sign::u64_to_u256(max_fee_per_gas),
         address,
         ic_evm_sign::u64_to_u256(value),
