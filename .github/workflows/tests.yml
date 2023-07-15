@@ -1,0 +1,23 @@
+
+name: Tests
+
+on:
+  push:
+    branches: [ "master" ]
+
+env:
+  RUST_BACKTRACE: short
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  CI: 1
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: Swatinem/rust-cache@v2
+      - run: export PATH=~/.cargo/bin:/usr/local/bin/:$PATH
+      - run: rustup target add wasm32-unknown-unknown
+      - run: make unit-tests
+      
