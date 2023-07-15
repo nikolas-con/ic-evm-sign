@@ -26,7 +26,7 @@ describe("Sign EVM Transactions", function () {
 
     const canisterId = Principal.fromText(canisters.backend.local);
 
-    const agent = new HttpAgent({ host: "http://localhost:8000" });
+    const agent = new HttpAgent({ host: "http://127.0.0.1:8000" });
     agent.fetchRootKey();
 
     const createActorOptions = { agent, canisterId };
