@@ -20,4 +20,5 @@ jobs:
       - run: export PATH=~/.cargo/bin:/usr/local/bin/:$PATH
       - run: rustup target add wasm32-unknown-unknown
       - run: make unit-tests
+      - run: make e2e-tests
       
