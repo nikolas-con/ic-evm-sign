@@ -1,18 +1,10 @@
-t.PHONY: all
-all: tests
+all-tests: e2e-test unit-test
 
-.PHONY: e2e-test
-.SILENT: e2e-test
-e2e-test: 
-	cd e2e/tests && ./test.sh
+e2e-tests: 
+	dfx start --clean --background; \
+	dfx deploy; \
+	cd e2e/tests && npm run test; \
+	dfx stop
 	
-.PHONY: unit-test
-.SILENT: unit-test
- unit-test: 
+unit-tests: 
 	cd lib && cargo test
-
-.PHONY: tests
-.SILENT: tests
-tests: e2e-test unit-test
-				
-
