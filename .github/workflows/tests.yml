@@ -20,7 +20,7 @@ jobs:
       - run: export PATH=~/.cargo/bin:/usr/local/bin/:$PATH
       - run: rustup target add wasm32-unknown-unknown
       - run: DFX_VERSION=0.13.1 sh -ci "$(curl -fsSL https://smartcontracts.org/install.sh)"
-      - run: mkdir ~/.config/dfx/ && cp ./test/networks.json ~/.config/dfx/networks.json
+      - run: mkdir ~/.config/dfx/ && cp ./e2e/tests/networks.json ~/.config/dfx/networks.json
       - run: dfx --version
       - run: dfx identity whoami
       - run: dfx start --background &> dfx.log
