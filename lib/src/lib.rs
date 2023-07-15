@@ -13,7 +13,10 @@ mod mocks;
 use mocks::{ic_call, ic_timestamp};
 
 mod utils;
+pub use utils::u64_to_u256;
 use utils::{get_address_from_public_key, get_derivation_path};
+
+use primitive_types::U256;
 
 mod ecdsa;
 use ecdsa::reply::*;
@@ -47,7 +50,7 @@ pub struct UserResponse {
     pub transactions: TransactionChainData,
 }
 
-pub fn init(env_opt: Option<Environment> ) {
+pub fn init(env_opt: Option<Environment>) {
     if let Some(env) = env_opt {
         STATE.with(|s| {
             let mut state = s.borrow_mut();
@@ -170,9 +173,9 @@ pub async fn deploy_contract(
     principal_id: Principal,
     bytecode: Vec<u8>,
     chain_id: u64,
-    max_priority_fee_per_gas: u64,
+    max_priority_fee_per_gas: U256,
     gas_limit: u64,
-    max_fee_per_gas: u64,
+    max_fee_per_gas: U256,
 ) -> Result<DeployContractResponse, String> {
     let users = STATE.with(|s| s.borrow().users.clone());
     let user;
@@ -197,7 +200,7 @@ pub async fn deploy_contract(
         gas_limit,
         max_fee_per_gas,
         to: "0x".to_string(),
-        value: 0,
+        value: U256::zero(),
         data,
         access_list: vec![],
         v: "0x00".to_string(),
@@ -216,11 +219,11 @@ pub async fn deploy_contract(
 pub async fn transfer_erc_20(
     principal_id: Principal,
     chain_id: u64,
-    max_priority_fee_per_gas: u64,
+    max_priority_fee_per_gas: U256,
     gas_limit: u64,
-    max_fee_per_gas: u64,
+    max_fee_per_gas: U256,
     address: String,
-    value: u64,
+    value: U256,
     contract_address: String,
 ) -> Result<TransferERC20Response, String> {
     let users = STATE.with(|s| s.borrow().users.clone());
@@ -248,7 +251,7 @@ pub async fn transfer_erc_20(
         gas_limit,
         max_fee_per_gas,
         to: contract_address,
-        value: 0,
+        value: U256::zero(),
         data,
         access_list: vec![],
         v: "0x00".to_string(),

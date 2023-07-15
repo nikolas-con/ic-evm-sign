@@ -69,9 +69,9 @@ async fn deploy_evm_contract(
         principal_id,
         bytecode,
         chain_id,
-        max_priority_fee_per_gas,
+        ic_evm_sign::u64_to_u256(max_priority_fee_per_gas),
         gas_limit,
-        max_fee_per_gas,
+        ic_evm_sign::u64_to_u256(max_fee_per_gas),
     )
     .await
     .map_err(|e| format!("Failed to call sign_with_ecdsa {}", e))
@@ -94,11 +94,11 @@ async fn transfer_erc_20(
     let res = ic_evm_sign::transfer_erc_20(
         principal_id,
         chain_id,
-        max_priority_fee_per_gas,
+        ic_evm_sign::u64_to_u256(max_priority_fee_per_gas),
         gas_limit,
-        max_fee_per_gas,
+        ic_evm_sign::u64_to_u256(max_fee_per_gas),
         address,
-        value,
+        ic_evm_sign::u64_to_u256(value),
         contract_address,
     )
     .await

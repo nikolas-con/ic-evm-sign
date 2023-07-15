@@ -1,5 +1,6 @@
 use easy_hasher::easy_hasher;
 use ic_cdk::export::Principal;
+use primitive_types::U256;
 
 pub fn get_derivation_path(caller: Principal) -> Vec<u8> {
     caller.as_slice().to_vec()
@@ -22,7 +23,7 @@ pub fn get_address_from_public_key(public_key: Vec<u8>) -> Result<String, String
     Ok(address)
 }
 
-pub fn get_transfer_data(address: &str, amount: u64) -> Result<String, String> {
+pub fn get_transfer_data(address: &str, amount: U256) -> Result<String, String> {
     if address.len() != 42 {
         return Err("Invalid address".to_string());
     }
@@ -32,7 +33,13 @@ pub fn get_transfer_data(address: &str, amount: u64) -> Result<String, String> {
 
     let address_64 = format!("{:0>64}", &address[2..]);
 
-    let amount_hex = format!("{:02x}", amount);
+    let mut bytes = [0; 32];
+    amount.to_big_endian(&mut bytes);
+    let amount_hex = bytes
+        .into_iter()
+        .map(|x| format!("{:02x}", x))
+        .collect::<Vec<String>>()
+        .concat();
     let amount_64 = format!("{:0>64}", amount_hex);
 
     Ok(method_id.to_owned() + &address_64 + &amount_64)
@@ -79,6 +86,20 @@ pub fn vec_u8_to_u64(vec: &Vec<u8>) -> u64 {
     u64::from_be_bytes(_vec).try_into().unwrap()
 }
 
+pub fn u256_to_vec_u8(u: &U256) -> Vec<u8> {
+    let mut bytes = [0; 32];
+    u.to_big_endian(&mut bytes);
+    bytes.into_iter().skip_while(|&x| x == 0).collect()
+}
+
+pub fn vec_u8_to_u256(vec: &Vec<u8>) -> U256 {
+    U256::from_big_endian(vec)
+}
+
+pub fn u64_to_u256(value: u64) -> U256 {
+    vec_u8_to_u256(&u64_to_vec_u8(&value))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -115,7 +136,8 @@ mod tests {
         let expected ="a9059cbb000000000000000000000000907dc4d0be5d691970cae886fcab34ed65a2cd660000000000000000000000000000000000000000000000000000000000000001";
 
         let address = "0x907dc4d0be5d691970cae886fcab34ed65a2cd66";
-        let amount = 1;
+        let amount = primitive_types::U256::one();
+
         let result = get_transfer_data(address, amount).unwrap();
         assert_eq!(result, expected);
     }
@@ -124,7 +146,7 @@ mod tests {
     fn get_transfer_data_with_invalid_address() {
         let expected = Err("Invalid address".to_string());
         let address = "0x00";
-        let value = 1;
+        let value = primitive_types::U256::one();
         let result = get_transfer_data(address, value);
         assert_eq!(result, expected);
     }
